@@ -22,13 +22,7 @@ def s3tup(config, access_key_id=None, secret_access_key=None, verbose=False, deb
 
     log.info('**** s3tup ****\n')
 
-    if isinstance(config, file): # if config is file, load yaml
-        config = yaml.load(config)
-    elif isinstance(config, basestring): # if config is string, it's a filename
-        config = yaml.load(file(config))
-    elif isinstance(config, list): # if config is a list
-        config = config
-    config = config or []
+    config = yaml.load(file(config))
 
     if access_key_id is None or secret_access_key is None:
         try:
