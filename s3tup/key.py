@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 import os
 
 import utils
@@ -98,6 +99,12 @@ class Key(object):
         for k in constants.KEY_HEADERS:
             try: headers[k.replace('_', '-')] = self.__dict__[k]
             except KeyError: pass
+
+        # Guess content-type
+        if 'content-type' not in headers:
+            t_guess = mimetypes.guess_type(self.name)[0]
+            if t_guess is not None:
+                headers['content-type'] = t_guess
 
         return headers
 
