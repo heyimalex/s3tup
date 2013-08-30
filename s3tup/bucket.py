@@ -23,7 +23,7 @@ class BucketFactory(object):
             conn = self.conn
         bucket = Bucket(conn, bucket_name, **kwargs)
         return bucket
-
+        
 
 class Bucket(object):
 
@@ -38,7 +38,7 @@ class Bucket(object):
                 raise TypeError("__init__() got an unexpected keyword argument\
                                  '{}'".format(attr))
 
-    def sync(self):
+    def sync(self, rsync_only=False):
 
         log.info("syncing bucket '{}'...".format(self.name))
 
@@ -75,10 +75,11 @@ class Bucket(object):
         else:
             unmodified = [k['name'] for k in utils.list_bucket(self.conn, self.name)]
 
-        if 'key_config' in self.__dict__:
-            for k in unmodified:
-                key = kf.make_key(k)
-                key.sync()
+        if not rsync_only:
+            if 'key_config' in self.__dict__:
+                for k in unmodified:
+                    key = kf.make_key(k)
+                    key.sync()
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
 
@@ -100,6 +101,6 @@ class Bucket(object):
                 log.info("setting website configuration...")
                 self.conn.make_request('PUT', self.name, None, 'website', data=self.website)
             else:
-                log.info("{}: deleting website configuration...".format(self.name))
+                log.info("deleting website configuration...")
                 self.conn.make_request('DELETE', self.name, None, 'website')
         except AttributeError: pass
