@@ -41,20 +41,6 @@ class Matcher(object):
 
         return matched
 
-class BucketList(object):
-
-    def __init__(self, conn, bucket, prefix):
-        self.conn = conn
-        self.bucket = bucket
-        self.prefix = prefix
-
-    def __iter__(self):
-         return self
-
-    def next(self):
-        return bucket_lister(self.bucket, prefix=self.prefix,
-                             delimiter=self.delimiter, marker=self.marker,
-                             headers=self.headers)
 
 def file_md5(filename):
     m = hashlib.md5()
@@ -65,21 +51,22 @@ def file_md5(filename):
             m.update(buf)
     return b64encode(m.digest()).strip()
 
-def list_bucket(conn, bucket_name):
+def list_bucket(conn, bucket_name, marker=None):
+    marker = None
+    more_results = True
+    while more_results:
+        params = {'marker': marker, 'max-keys': 10}
+        r = conn.make_request('GET', bucket_name, params=params)
+        soup = BeautifulSoup(r.text)
+        root = soup.find('listbucketresult')
+        
+        for c in root.find_all('contents'):
+            key = c.find('key').text
+            etag_hex = c.find('etag').text.replace('"', '')
+            etag_bin = binascii.unhexlify(etag_hex)
+            etag = binascii.b2a_base64(etag_bin).strip()
+            yield {'name': key, 'etag': etag}
+            marker = key
 
-    r = conn.make_request('GET', bucket_name)
-    soup = BeautifulSoup(r.text)
-    root = soup.find('listbucketresult')
-    out = []
-   
-    for c in root.find_all('contents'):
-        key = c.find('key').text
-        etag_hex = c.find('etag').text.replace('"', '')
-        etag_bin = binascii.unhexlify(etag_hex)
-        etag = binascii.b2a_base64(etag_bin).strip()
-        out.append({'name': key, 'etag': etag})
-
-    if root.find('istruncated').text == 'true':
-        marker = root.find('marker').text
-
-    return out
+        more_results = root.find('istruncated').text == 'true'
+        

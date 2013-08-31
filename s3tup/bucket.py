@@ -15,12 +15,14 @@ class BucketFactory(object):
 
     def make_bucket(self, **kwargs):
         bucket_name = kwargs.pop('bucket')
+
         try:
             access_key_id = kwargs.pop('access_key_id')
             secret_access_key = kwargs.pop('secret_access_key')
             conn = Connection(access_key_id, secret_access_key)
         except KeyError:
             conn = self.conn
+
         bucket = Bucket(conn, bucket_name, **kwargs)
         return bucket
         
@@ -35,8 +37,8 @@ class Bucket(object):
             if attr in constants.BUCKET_ATTRS:
                 self.__dict__[attr] = kwargs[attr]
             else:
-                raise TypeError("__init__() got an unexpected keyword argument\
-                                 '{}'".format(attr))
+                raise TypeError("Bucket.__init__() got an unexpected keyword\
+                                 argument '{}'".format(attr))
 
     def sync(self, rsync_only=False):
 
@@ -59,6 +61,7 @@ class Bucket(object):
         # self.sync_acl()
         # self.sync_logging()
         # self.sync_notification()
+        # self.sync_policy()
         # self.sync_tagging()
         # self.sync_versioning()
         self.sync_lifecycle()
@@ -70,8 +73,8 @@ class Bucket(object):
         except AttributeError: kf = KeyFactory(self.conn, self.name)
 
         if 'rsync' in self.__dict__:
-            rsout = rsync(kf, **self.rsync)
-            unmodified = rsout['unmodified']
+            rs_out = rsync(kf, **self.rsync)
+            unmodified = rs_out['unmodified']
         else:
             unmodified = [k['name'] for k in utils.list_bucket(self.conn, self.name)]
 
@@ -94,12 +97,12 @@ class Bucket(object):
                 self.conn.make_request('DELETE', self.name, None, 'cors')
         except AttributeError: pass
 
-
     def sync_website(self):
         try:
             if self.website is not None:
                 log.info("setting website configuration...")
-                self.conn.make_request('PUT', self.name, None, 'website', data=self.website)
+                self.conn.make_request('PUT', self.name, None, 'website',
+                                       data=self.website)
             else:
                 log.info("deleting website configuration...")
                 self.conn.make_request('DELETE', self.name, None, 'website')

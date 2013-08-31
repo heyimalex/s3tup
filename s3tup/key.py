@@ -28,7 +28,8 @@ class KeyConfigurator(object):
 
     def __init__(self, **kwargs):
 
-        # instantiating objects in constructor is antipattern
+        # instantiating objects in constructor is an antipattern
+        # but whatever
         self.matcher = utils.Matcher(
                 patterns=kwargs.pop('patterns', None),
                 ignore_patterns=kwargs.pop('ignore_patterns', None),
@@ -70,7 +71,7 @@ class Key(object):
             if attr in constants.KEY_ATTRS: # check if the parameter is allowed
                 self.__dict__[attr] = kwargs[attr]
             else:
-                raise TypeError("__init__() got an unexpected keyword argument\
+                raise TypeError("Key.__init__() got an unexpected keyword argument\
                                  '{}'".format(attr))
 
     @property
@@ -97,14 +98,16 @@ class Key(object):
             headers['x-amz-meta-' + k] = v
 
         for k in constants.KEY_HEADERS:
-            try: headers[k.replace('_', '-')] = self.__dict__[k]
+            try:
+                if self.__dict__[k] is not None:
+                    headers[k.replace('_', '-')] = self.__dict__[k]
             except KeyError: pass
 
         # Guess content-type
         if 'content-type' not in headers:
-            t_guess = mimetypes.guess_type(self.name)[0]
-            if t_guess is not None:
-                headers['content-type'] = t_guess
+            content_type_guess = mimetypes.guess_type(self.name)[0]
+            if content_type_guess is not None:
+                headers['content-type'] = content_type_guess
 
         return headers
 
