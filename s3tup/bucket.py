@@ -57,11 +57,11 @@ class Bucket(object):
 
         # TODO- implement all of these methods
         # self.sync_acl()
-        # self.sync_lifecycle()
         # self.sync_logging()
         # self.sync_notification()
         # self.sync_tagging()
         # self.sync_versioning()
+        self.sync_lifecycle()
         self.sync_cors()
         self.sync_website()
 
@@ -103,4 +103,15 @@ class Bucket(object):
             else:
                 log.info("deleting website configuration...")
                 self.conn.make_request('DELETE', self.name, None, 'website')
+        except AttributeError: pass
+
+    def sync_lifecycle(self):
+        try:
+            if self.lifecycle is not None:
+                log.info("setting lifecycle configuration...")
+                self.conn.make_request('PUT', self.name, None, 'lifecycle',
+                                       data=self.lifecycle)
+            else:
+                log.info("deleting lifecycle configuration...")
+                self.conn.make_request('DELETE', self.name, None, 'lifecycle')
         except AttributeError: pass
