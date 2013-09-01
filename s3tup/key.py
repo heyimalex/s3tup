@@ -37,7 +37,6 @@ class KeyConfigurator(object):
                 ignore_regexes=kwargs.pop('ignore_regexes', None),
         )
 
-        self.metadata = {}
         for k, v in kwargs.iteritems():
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
@@ -50,8 +49,8 @@ class KeyConfigurator(object):
             if attr in self.__dict__ and attr != 'metadata':
                 key.__dict__[attr] = self.__dict__[attr]
 
-        if self.metadata:
-            key.metadata.update(self.metadata)
+        try: key.metadata.update(self.metadata)
+        except AttributeError: pass
 
         return key
 
