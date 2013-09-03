@@ -55,7 +55,7 @@ def list_bucket(conn, bucket_name, marker=None):
     marker = None
     more_results = True
     while more_results:
-        params = {'marker': marker, 'max-keys': 10}
+        params = {'marker': marker}
         r = conn.make_request('GET', bucket_name, params=params)
         soup = BeautifulSoup(r.text)
         root = soup.find('listbucketresult')
