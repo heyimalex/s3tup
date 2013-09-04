@@ -52,10 +52,9 @@ def file_md5(filename):
     return b64encode(m.digest()).strip()
 
 def list_bucket(conn, bucket_name, marker=None):
-    marker = None
     more_results = True
+    params = {}
     while more_results:
-        params = {'marker': marker}
         r = conn.make_request('GET', bucket_name, params=params)
         soup = BeautifulSoup(r.text)
         root = soup.find('listbucketresult')
@@ -69,4 +68,5 @@ def list_bucket(conn, bucket_name, marker=None):
             marker = key
 
         more_results = root.find('istruncated').text == 'true'
+        params = {'marker': marker}
         
