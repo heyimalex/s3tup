@@ -9,7 +9,6 @@ KEY_ATTRS = (
     'acl',
     'canned_acl',
     'encrypt',
-    'redirect',
     'metadata',
 )
 
@@ -31,6 +30,7 @@ BUCKET_ATTRS = (
     'region',
     'rsync',
     'website',
+    'redirects',
     #'acl',
     #'logging',
     #'notification',

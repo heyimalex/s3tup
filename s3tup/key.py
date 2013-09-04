@@ -77,9 +77,6 @@ class Key(object):
     def headers(self):
         headers = {}
 
-        try: headers['x-amz-website-redirect-location'] = self.redirect
-        except AttributeError: pass
-
         try: headers['x-amz-acl'] = self.canned_acl
         except AttributeError: pass
 

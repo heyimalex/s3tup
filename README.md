@@ -52,6 +52,7 @@ cors | | The cors configuration of the bucket. Valid values: Either a string xml
 lifecycle | | The lifecycle configuration of the bucket. Valid values: Either a string xml lifecycle configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTlifecycle.html) page) or `None` which will delete the lifecycle configuration for this bucket all together.
 key_config | | Takes a list of key configuration dicts and applies them to all of the applicable keys in the bucket. See section Key Configuration for details.
 rsync | | Takes an rsync configuration dict and "rsyncs" a folder with the bucket. See section Rsync Configuration for details.
+redirects | [] | Takes a list of [key, redirect location] pairs and will create a zero byte object at `key` that redirects to whatever redirect location you specify.
 
 #### Key Configuration
 
@@ -64,7 +65,7 @@ reduced_redundancy | False | Boolean option to use reduced redundancy storage.
 encrypt | False | Boolean option to use server side encryption.
 canned_acl | | The [canned acl](http://docs.aws.amazon.com/AmazonS3/latest/dev/ACLOverview.html#CannedACL) for the key.
 acl |  | String xml acl policy for this key.
-redirect | None | String value of url to redirect to. Only applicable if bucket is configured as a website. More information can be found in the request headers section of [this]() page. 
+found in the request headers section of [this]() page. 
 cache_control | None | String value of the cache-control header.
 content_disposition | None | String value of the content-disposition header.
 content_encoding | None | String value of the content-encoding header. S3tup will not guess content encoding.
