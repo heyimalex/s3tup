@@ -78,18 +78,18 @@ class Bucket(object):
         else:
             unmodified = [k['name'] for k in utils.list_bucket(self.conn, self.name)]
 
-        if not rsync_only:
-            if 'key_config' in self.__dict__:
-                for k in unmodified:
-                    key = kf.make_key(k)
-                    key.sync()
-
         try:
             for k,v in self.redirects:
                 log.info("creating redirect from {} to {}".format(k, v))
                 headers = {'x-amz-website-redirect-location': v}
                 self.conn.make_request('PUT', self.name, k, headers=headers, data=None)
         except AttributeError: pass
+
+        if not rsync_only:
+            if 'key_config' in self.__dict__:
+                for k in unmodified:
+                    key = kf.make_key(k)
+                    key.sync()
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
 
