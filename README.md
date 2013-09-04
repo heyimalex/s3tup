@@ -65,7 +65,6 @@ reduced_redundancy | False | Boolean option to use reduced redundancy storage.
 encrypt | False | Boolean option to use server side encryption.
 canned_acl | | The [canned acl](http://docs.aws.amazon.com/AmazonS3/latest/dev/ACLOverview.html#CannedACL) for the key.
 acl |  | String xml acl policy for this key.
-found in the request headers section of [this]() page. 
 cache_control | None | String value of the cache-control header.
 content_disposition | None | String value of the content-disposition header.
 content_encoding | None | String value of the content-encoding header. S3tup will not guess content encoding.
