@@ -15,15 +15,19 @@ class BucketFactory(object):
 
     def make_bucket(self, **kwargs):
         bucket_name = kwargs.pop('bucket')
+        kf = KeyFactory(self.conn, bucket_name, kwargs.pop('key_config', []))
 
+        '''
         try:
             access_key_id = kwargs.pop('access_key_id')
             secret_access_key = kwargs.pop('secret_access_key')
             conn = Connection(access_key_id, secret_access_key)
         except KeyError:
             conn = self.conn
+        '''
 
         bucket = Bucket(conn, bucket_name, **kwargs)
+        bucket.key_factory = kf
         return bucket
         
 
@@ -66,10 +70,6 @@ class Bucket(object):
         self.sync_tagging()
         self.sync_versioning()
         self.sync_website()
-
-        try: # create key factory from key_config if it's set
-            kf = KeyFactory(self.conn, self.name, self.key_config)
-        except AttributeError: kf = KeyFactory(self.conn, self.name)
 
         if 'rsync' in self.__dict__:
             rs_out = rsync(kf, **self.rsync)

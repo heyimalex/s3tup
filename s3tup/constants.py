@@ -26,7 +26,6 @@ BUCKET_ATTRS = (
     'bucket',
     'canned_acl',
     'cors',
-    'key_config',
     'lifecycle',
     'logging',
     'notification',
