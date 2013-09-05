@@ -1,5 +1,7 @@
 import logging
 
+from bs4 import BeautifulSoup
+
 from connection import Connection
 from key import KeyFactory
 from rsync import rsync
@@ -50,10 +52,7 @@ class Bucket(object):
                 raise TypeError("Bucket.__init__() got an unexpected keyword\
                                  argument '{}'".format(attr))
 
-    def __iter__(self):
-        return iter(self.list())
-
-    def list(self):
+    def get_remote_keys(self):
         more = True
         params = {}
         while more:
@@ -63,13 +62,15 @@ class Bucket(object):
             
             for c in root.find_all('contents'):
                 key = c.find('key').text
+                modified = c.fing('lastmodified').text
                 size = c.find('size').text
-                
+
                 etag_hex = c.find('etag').text.replace('"', '')
                 etag_bin = binascii.unhexlify(etag_hex)
                 etag = binascii.b2a_base64(etag_bin).strip()
                 
-                yield {'name': key, 'etag': etag, 'size': size}
+                yield {'name': key, 'etag': etag, 'size': size,
+                       'modified': modified}
                 marker = key
 
             more = root.find('istruncated').text == 'true'
