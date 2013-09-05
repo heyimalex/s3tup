@@ -15,7 +15,16 @@ class KeyFactory(object):
 
         self.configurators = []
         for c in configs:
-            self.configurators.append(KeyConfigurator(**c))
+            self.configurators.append(self.make_key_configurator(c))
+
+    def make_key_configurator(self, config):
+        matcher = utils.Matcher(
+            patterns=config.pop('patterns', None),
+            ignore_patterns=config.pop('ignore_patterns', None),
+            regexes=config.pop('regexes', None),
+            ignore_regexes=config.pop('ignore_regexes', None),
+        )
+        return KeyConfigurator(matcher, **c)
 
     def make_key(self, key_name):
         key = Key(self.conn, key_name, self.bucket_name)
@@ -26,22 +35,16 @@ class KeyFactory(object):
 
 class KeyConfigurator(object):
 
-    def __init__(self, **kwargs):
-
-        # instantiating objects in constructor is an antipattern
-        # but whatever
-        self.matcher = utils.Matcher(
-                patterns=kwargs.pop('patterns', None),
-                ignore_patterns=kwargs.pop('ignore_patterns', None),
-                regexes=kwargs.pop('regexes', None),
-                ignore_regexes=kwargs.pop('ignore_regexes', None),
-        )
+    def __init__(self, matcher=None, **kwargs):
+        self.matcher = matcher
 
         for k, v in kwargs.iteritems():
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
 
     def effects_key(self, key_name):
+        if self.matcher is None:
+            return True
         return self.matcher.match(key_name)
 
     def configure(self, key):
@@ -103,7 +106,7 @@ class Key(object):
         if 'content-type' not in headers:
             content_type_guess = mimetypes.guess_type(self.name)[0]
             if content_type_guess is not None:
-                headers['content-type'] = content_type_guess
+                headers['Content-Type'] = content_type_guess
 
         return headers
 
@@ -117,21 +120,25 @@ class Key(object):
         self.conn.make_request('PUT', self.bucket, self.name, headers=headers)
         self.sync_acl()
 
-    def rsync(self, flo):
+    def rsync(self, file_like_object):
         log.info("uploading key '{}'...".format(self.name))
 
-        data = flo.read()
-        print data
         headers = self.headers
-        headers['content-length'] = os.fstat(flo.fileno()).st_size
-        
+        data = file_like_object.read()
+
         self.conn.make_request('PUT', self.bucket, self.name, headers=headers, 
                                 data=data)
         self.sync_acl()
 
     def sync_acl(self):
+        headers = {}
+        data = None
         try:
+            if self.acl is not None:
+                data = self.acl
+            else:
+                headers["x-amz-acl"] = "private"
             self.conn.make_request('PUT', self.bucket, self.name, 'acl',
-                                   data=self.acl)
+                                   data=data, headers=headers)
         except AttributeError: pass
 
