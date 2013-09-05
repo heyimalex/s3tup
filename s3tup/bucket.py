@@ -60,11 +60,11 @@ class Bucket(object):
         # TODO- implement all of these methods
         # self.sync_acl()
         # self.sync_notification()
-        # self.sync_policy()
         # self.sync_versioning()
         self.sync_cors()
         self.sync_lifecycle()
         self.sync_logging()
+        self.sync_policy()
         self.sync_tagging()
         self.sync_website()
 
@@ -125,6 +125,14 @@ class Bucket(object):
                 data = '<?xml version="1.0" encoding="UTF-8"?>\
                         <BucketLoggingStatus xmlns="http://doc.s3.amazonaws.com/2006-03-01" />'
             self.conn.make_request('PUT', self.name, None, 'logging', data=data)
+        except AttributeError: pass
+
+    def sync_policy(self):
+        try:
+            if self.policy is not None:
+                self.conn.make_request('PUT', self.name, None, 'policy', data=self.policy)
+            else:
+                self.conn.make_request('DELETE', self.name, None, 'policy')
         except AttributeError: pass
 
     def sync_tagging(self):

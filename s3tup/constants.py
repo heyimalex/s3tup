@@ -28,6 +28,7 @@ BUCKET_ATTRS = (
     'key_config',
     'lifecycle',
     'logging',
+    'policy',
     'region',
     'rsync',
     'tagging',
@@ -35,7 +36,6 @@ BUCKET_ATTRS = (
     'redirects',
     #'acl',
     #'notification',
-    #'policy',
     #'request_payment',
     #'versioning',
 )
