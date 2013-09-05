@@ -23,7 +23,6 @@ KEY_HEADERS = (
 
 BUCKET_ATTRS = (
     'acl',
-    'bucket',
     'canned_acl',
     'cors',
     'lifecycle',
