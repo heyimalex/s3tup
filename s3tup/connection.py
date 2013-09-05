@@ -6,10 +6,14 @@ import hmac
 import urllib
 
 from bs4 import BeautifulSoup
-import requests
+from requests import Session, Request
+from requests.structures import CaseInsensitiveDict
 
 log = logging.getLogger('s3tup.connection')
 stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
+
+class S3Exception(Exception):
+    pass
 
 class Connection(object):
 
@@ -26,28 +30,24 @@ class Connection(object):
         except TypeError:
             url += '?{}'.format(params) if params is not None else ''
 
-        # Lowercase all header keys
-        headers = {k.lower():v for k,v in headers.iteritems()}
+        # Make headers case insensitive
+        headers = CaseInsensitiveDict(headers)
 
-        headers['host'] = '{}.s3.amazonaws.com'.format(bucket)
+        headers['Host'] = '{}.s3.amazonaws.com'.format(bucket)
 
-        if 'content-md5' in headers:
-            md5 = headers['content-md5']
-        elif data is not None:
+        if data is not None:
             m = hashlib.md5()
             m.update(data)
             md5 = b64encode(m.digest())
-            headers['content-md5'] = md5
+            headers['Content-MD5'] = md5
         else:
             md5 = ''
 
-        try: content_type = headers['content-type']
+        try: content_type = headers['Content-Type']
         except KeyError: content_type = ''
 
-        try: date = headers['x-amz-date']
-        except KeyError:
-            date = formatdate(timeval=None, localtime=False, usegmt=True)
-            headers['x-amz-date'] = date
+        date = formatdate(timeval=None, localtime=False, usegmt=True)
+        headers['x-amz-date'] = date
 
         # Construct canonicalized resource string
         canonicalized_resource = '/' + bucket
@@ -75,30 +75,33 @@ class Connection(object):
         # Set authorization header
         headers['Authorization'] = 'AWS {}:{}'.format(self.access_key_id, signature)
 
-        # Logging stuff
-        log.debug('{}: {}'.format(method, url))
-        log.debug('headers:')
-        for k, v in headers.iteritems():
-            log.debug(' {}: {}'.format(k, v))
+        # Prepare Request
+        s = Session()
+        req = Request(method, url, data=data, headers=headers).prepare()
 
-        r = requests.request(method, url, headers=headers, data=data)
-        log.debug('response: {}\n'.format(r.status_code))
+        # Logging stuff
+        log.debug('{} {}'.format(method, url))
+        log.debug('headers:')
+        for k in sorted(req.headers.iterkeys()):
+            log.debug(' {}: {}'.format(k, req.headers[k]))
+
+        # Send request
+        resp = s.send(req)
+        log.debug('response: {}\n'.format(resp.status_code))
         stats[method.upper()] += 1
         
         # Handle errors
-        if r.status_code/100 != 2:
-            log.error("s3 responded with non 2xx response code!")
-            log.error("response code: {}".format(r.status_code))
-            log.error("request headers:")
-            for k,v in r.request.headers.iteritems():
-                log.error("  {}: {}".format(k,v))
-            try:
-                soup = BeautifulSoup(r.text)
-                error = soup.find('error')
-                for c in error.children:
-                    log.error('{}: {}'.format(c.name, c.text))
-            except:pass
-            raise Exception("s3 responded with non 2xx response code")
+        if resp.status_code/100 != 2:
+            log.error("S3 replied with non 2xx response code!!!!")
+            log.error('  request: {} {}'.format(method, url))
+            soup = BeautifulSoup(resp.text)
+            error = soup.find('error')
+            for c in error.children:
+                log.error('  {}: {}'.format(c.name, c.text))
 
-        return r
+            code = error.find('code').text
+            message = error.find('message').text
+            raise S3Exception("{}: {}".format(code, message))
+
+        return resp
 
