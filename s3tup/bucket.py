@@ -10,32 +10,33 @@ log = logging.getLogger('s3tup.bucket')
 
 class BucketFactory(object):
 
-    def __init__(self, conn=None):
-        self.conn = conn
-
-    def make_bucket(self, **kwargs):
+    def make_bucket(self, conn=None, **kwargs):
+        
         bucket_name = kwargs.pop('bucket')
-        kf = KeyFactory(self.conn, bucket_name, kwargs.pop('key_config', []))
 
-        '''
-        try:
+        if conn is None:
             access_key_id = kwargs.pop('access_key_id')
             secret_access_key = kwargs.pop('secret_access_key')
             conn = Connection(access_key_id, secret_access_key)
-        except KeyError:
-            conn = self.conn
-        '''
 
-        bucket = Bucket(conn, bucket_name, **kwargs)
-        bucket.key_factory = kf
+        if 'key_config' in kwargs:
+            key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
+        else: key_factory = None
+
+        bucket = Bucket(conn, bucket_name, key_factory, **kwargs)
         return bucket
         
 
 class Bucket(object):
 
-    def __init__(self, conn, name, **kwargs):
+    def __init__(self, conn, name, key_factory=None, **kwargs):
         self.conn = conn
         self.name = name
+
+        self.key_factory = key_factory
+
+        # set defaults for required attributes
+        self.redirects = kwargs.pop('redirects', [])
 
         for attr in kwargs:
             if attr in constants.BUCKET_ATTRS:
@@ -45,6 +46,9 @@ class Bucket(object):
                                  argument '{}'".format(attr))
 
     def sync(self, rsync_only=False):
+        self._sync_bucket(rsync_only)
+
+    def _sync_bucket(self, rsync_only=False):
 
         log.info("syncing bucket '{}'...".format(self.name))
 
@@ -72,7 +76,7 @@ class Bucket(object):
         self.sync_website()
 
         if 'rsync' in self.__dict__:
-            rs_out = rsync(kf, **self.rsync)
+            rs_out = rsync(self.key_factory, **self.rsync)
             unmodified = rs_out['unmodified']
         else:
             unmodified = [k['name'] for k in utils.list_bucket(self.conn, self.name)]
@@ -84,13 +88,17 @@ class Bucket(object):
                 self.conn.make_request('PUT', self.name, k, headers=headers, data=None)
         except AttributeError: pass
 
-        if not rsync_only:
-            if 'key_config' in self.__dict__:
-                for k in unmodified:
-                    key = kf.make_key(k)
-                    key.sync()
+        if not rsync_only and self.key_factory is not None:
+            for k in unmodified:
+                key = self.key_factory.make_key(k)
+                key.sync()
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
+
+    def _sync_keys(self):
+        pass
+
+    # Individual syncing methods
 
     def sync_acl(self):
         try:

@@ -9,12 +9,12 @@ log = logging.getLogger('s3tup.key')
 
 class KeyFactory(object):
 
-    def __init__(self, conn, bucket_name, config=[]):
+    def __init__(self, conn, bucket_name, configs=[]):
         self.conn = conn
         self.bucket_name = bucket_name
 
         self.configurators = []
-        for c in config:
+        for c in configs:
             self.configurators.append(KeyConfigurator(**c))
 
     def make_key(self, key_name):

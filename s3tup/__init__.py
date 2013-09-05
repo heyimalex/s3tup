@@ -25,9 +25,9 @@ def s3tup(config, access_key_id=None, secret_access_key=None, rsync_only=False,)
         except KeyError: raise Exception('You must supply an aws secret access key.')
 
     conn = Connection(access_key_id, secret_access_key)
-    bf = BucketFactory(conn)
+    bf = BucketFactory()
     for c in config:
-        b = bf.make_bucket(**c)
+        b = bf.make_bucket(conn, **c)
         b.sync(rsync_only)
     
     from connection import stats
