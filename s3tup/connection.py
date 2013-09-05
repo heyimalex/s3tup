@@ -23,6 +23,12 @@ class Connection(object):
 
     def make_request(self, method, bucket, key=None, params=None, headers={}, data=None):
 
+        # Remove params that are set to None
+        if isinstance(params, dict):
+            for k,v in params.copy().iteritems():
+                if v is None:
+                    params.pop(k)
+
         # Construct target url
         url = 'http://{}.s3.amazonaws.com'.format(bucket)
         url += '/{}'.format(key) if key is not None else '/'
