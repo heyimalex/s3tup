@@ -61,11 +61,11 @@ class Bucket(object):
         # self.sync_acl()
         # self.sync_notification()
         # self.sync_policy()
-        # self.sync_tagging()
         # self.sync_versioning()
         self.sync_cors()
         self.sync_lifecycle()
         self.sync_logging()
+        self.sync_tagging()
         self.sync_website()
 
         try: # create key factory from key_config if it's set
@@ -125,6 +125,14 @@ class Bucket(object):
                 data = '<?xml version="1.0" encoding="UTF-8"?>\
                         <BucketLoggingStatus xmlns="http://doc.s3.amazonaws.com/2006-03-01" />'
             self.conn.make_request('PUT', self.name, None, 'logging', data=data)
+        except AttributeError: pass
+
+    def sync_tagging(self):
+        try:
+            if self.tagging is not None:
+                self.conn.make_request('PUT', self.name, None, 'tagging', data=self.tagging)
+            else:
+                self.conn.make_request('DELETE', self.name, None, 'tagging')
         except AttributeError: pass
 
     def sync_website(self):

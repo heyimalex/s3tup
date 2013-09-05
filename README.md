@@ -50,7 +50,8 @@ canned_acl | | The [canned acl](http://docs.aws.amazon.com/AmazonS3/latest/dev/A
 website | | The website configuration of the bucket. Valid values: Either a string xml website configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTwebsite.html) page) or `None` which will delete the website configuration for this bucket all together.
 cors | | The cors configuration of the bucket. Valid values: Either a string xml cors configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTcors.html) page) or `None` which will delete the cors configuration for this bucket all together.
 lifecycle | | The lifecycle configuration of the bucket. Valid values: Either a string xml lifecycle configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTlifecycle.html) page) or `None` which will delete the lifecycle configuration for this bucket all together.
-logging | | The loggingconfiguration of the bucket. Valid values: Either a string xml logging configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTlogging.html) page) or `None` which will delete the logging configuration for this bucket all together.
+logging | | The logging configuration of the bucket. Valid values: Either a string xml logging configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTlogging.html) page) or `None` which will delete the logging configuration for this bucket all together.
+tagging | | The tagging configuration of the bucket. Valid values: Either a string xml tagging configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTtagging.html) page) or `None` which will delete all tags from this bucket.
 key_config | | Takes a list of key configuration dicts and applies them to all of the applicable keys in the bucket. See section Key Configuration for details.
 rsync | | Takes an rsync configuration dict and "rsyncs" a folder with the bucket. See section Rsync Configuration for details.
 redirects | [ ] | Takes a list of [key, redirect location] pairs and will create a zero byte object at `key` that redirects to whatever redirect location you specify.
@@ -72,7 +73,7 @@ content_encoding | None | String value of the content-encoding header. S3tup wil
 content_language | None | String value of the content-language header.
 content_type | None | String value of the content-type header. If not explicitly set, s3tup will make a best guess based on the extension.
 expires | None | String value of the expires header.
-metadata | {} | Dict of metadata headers to set on the key.
+metadata | { } | Dict of metadata headers to set on the key.
 
 #### Rsync Configuration
 

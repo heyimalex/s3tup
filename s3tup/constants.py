@@ -30,12 +30,12 @@ BUCKET_ATTRS = (
     'logging',
     'region',
     'rsync',
+    'tagging',
     'website',
     'redirects',
     #'acl',
     #'notification',
     #'policy',
     #'request_payment',
-    #'tagging',
     #'versioning',
 )
