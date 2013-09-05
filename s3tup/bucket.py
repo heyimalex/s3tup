@@ -57,8 +57,7 @@ class Bucket(object):
             data = None
         self.conn.make_request('PUT', self.name, headers=headers, data=data)
 
-        # TODO- implement all of these methods
-        # self.sync_acl()
+        self.sync_acl()
         self.sync_cors()
         self.sync_lifecycle()
         self.sync_logging()
@@ -92,6 +91,19 @@ class Bucket(object):
                     key.sync()
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
+
+    def sync_acl(self):
+        try:
+            if self.acl is not None:
+                log.info("setting bucket acl...")
+                headers = {}
+                data = self.acl
+            else:
+                log.info("setting default bucket acl...")
+                headers = {"x-amz-acl":"private"}
+                data = None
+            self.conn.make_request('PUT', self.name, None, 'acl', data=data, headers=headers)
+        except AttributeError: pass
 
     def sync_cors(self):
         try:
@@ -141,24 +153,30 @@ class Bucket(object):
     def sync_policy(self):
         try:
             if self.policy is not None:
+                log.info("setting bucket policy...")
                 self.conn.make_request('PUT', self.name, None, 'policy', data=self.policy)
             else:
+                log.info("deleting bucket policy...")
                 self.conn.make_request('DELETE', self.name, None, 'policy')
         except AttributeError: pass
 
     def sync_tagging(self):
         try:
             if self.tagging is not None:
+                log.info("setting bucket tags...")
                 self.conn.make_request('PUT', self.name, None, 'tagging', data=self.tagging)
             else:
+                log.info("deleting bucket tags...")
                 self.conn.make_request('DELETE', self.name, None, 'tagging')
         except AttributeError: pass
 
     def sync_versioning(self):
         try:
             if self.versioning:
+                log.info("enabling versioning...")
                 status = 'Enabled'
             else:
+                log.info("suspending versioning...")
                 status = 'Suspended'
             data = '<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\
                       <Status>{}</Status>\

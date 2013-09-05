@@ -22,6 +22,7 @@ KEY_HEADERS = (
 )
 
 BUCKET_ATTRS = (
+    'acl',
     'bucket',
     'canned_acl',
     'cors',
@@ -36,6 +37,5 @@ BUCKET_ATTRS = (
     'versioning',
     'website',
     'redirects',
-    #'acl',
     #'request_payment',
 )
