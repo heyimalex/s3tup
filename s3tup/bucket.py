@@ -104,17 +104,6 @@ class Bucket(object):
                 self.conn.make_request('DELETE', self.name, None, 'cors')
         except AttributeError: pass
 
-    def sync_website(self):
-        try:
-            if self.website is not None:
-                log.info("setting website configuration...")
-                self.conn.make_request('PUT', self.name, None, 'website',
-                                       data=self.website)
-            else:
-                log.info("deleting website configuration...")
-                self.conn.make_request('DELETE', self.name, None, 'website')
-        except AttributeError: pass
-
     def sync_lifecycle(self):
         try:
             if self.lifecycle is not None:
@@ -136,4 +125,15 @@ class Bucket(object):
                 data = '<?xml version="1.0" encoding="UTF-8"?>\
                         <BucketLoggingStatus xmlns="http://doc.s3.amazonaws.com/2006-03-01" />'
             self.conn.make_request('PUT', self.name, None, 'logging', data=data)
+        except AttributeError: pass
+
+    def sync_website(self):
+        try:
+            if self.website is not None:
+                log.info("setting website configuration...")
+                self.conn.make_request('PUT', self.name, None, 'website',
+                                       data=self.website)
+            else:
+                log.info("deleting website configuration...")
+                self.conn.make_request('DELETE', self.name, None, 'website')
         except AttributeError: pass
