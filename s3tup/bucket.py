@@ -1,4 +1,5 @@
 import logging
+import binascii
 
 from bs4 import BeautifulSoup
 
@@ -28,7 +29,8 @@ class BucketFactory(object):
 
         if 'key_config' in kwargs:
             key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
-        else: key_factory = None
+        else:
+            key_factory = None
 
         bucket = Bucket(conn, bucket_name, key_factory, **kwargs)
         return bucket
@@ -52,17 +54,18 @@ class Bucket(object):
                 raise TypeError("Bucket.__init__() got an unexpected keyword\
                                  argument '{}'".format(attr))
 
-    def get_remote_keys(self):
+    def get_remote_keys(self, prefix=None):
         more = True
-        params = {}
+        marker = None
         while more:
+            params = {'marker': marker, 'prefix': prefix}
             r = self.conn.make_request('GET', self.name, params=params)
             soup = BeautifulSoup(r.text)
             root = soup.find('listbucketresult')
             
             for c in root.find_all('contents'):
                 key = c.find('key').text
-                modified = c.fing('lastmodified').text
+                modified = c.find('lastmodified').text
                 size = c.find('size').text
 
                 etag_hex = c.find('etag').text.replace('"', '')
@@ -74,7 +77,12 @@ class Bucket(object):
                 marker = key
 
             more = root.find('istruncated').text == 'true'
-            params = {'marker': marker}
+
+    def make_key(self, key_name):
+        if self.key_factory is None:
+            return Key(self.conn, key_name, self.name)
+        else:
+            return self.key_factory.make_key(key_name)
 
     def sync(self, rsync_only=False):
         log.info("syncing bucket '{}'...".format(self.name))
