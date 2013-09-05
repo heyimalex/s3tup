@@ -24,7 +24,7 @@ class KeyFactory(object):
             regexes=config.pop('regexes', None),
             ignore_regexes=config.pop('ignore_regexes', None),
         )
-        return KeyConfigurator(matcher, **c)
+        return KeyConfigurator(matcher, **config)
 
     def make_key(self, key_name):
         key = Key(self.conn, key_name, self.bucket_name)

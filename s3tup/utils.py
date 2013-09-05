@@ -1,5 +1,6 @@
 from fnmatch import fnmatch
 from base64 import b64encode
+import os
 import re
 import hashlib
 import binascii
@@ -51,22 +52,8 @@ def file_md5(filename):
             m.update(buf)
     return b64encode(m.digest()).strip()
 
-def list_bucket(conn, bucket_name, marker=None):
-    more_results = True
-    params = {}
-    while more_results:
-        r = conn.make_request('GET', bucket_name, params=params)
-        soup = BeautifulSoup(r.text)
-        root = soup.find('listbucketresult')
-        
-        for c in root.find_all('contents'):
-            key = c.find('key').text
-            etag_hex = c.find('etag').text.replace('"', '')
-            etag_bin = binascii.unhexlify(etag_hex)
-            etag = binascii.b2a_base64(etag_bin).strip()
-            yield {'name': key, 'etag': etag}
-            marker = key
-
-        more_results = root.find('istruncated').text == 'true'
-        params = {'marker': marker}
-        
+def os_walk_iter(src):
+    for path, dirs, files in os.walk(src):
+        for f in files:
+            full_path = os.path.join(path, f)
+            yield os.path.relpath(full_path, src)

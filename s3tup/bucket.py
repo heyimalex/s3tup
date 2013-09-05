@@ -66,7 +66,7 @@ class Bucket(object):
             for c in root.find_all('contents'):
                 key = c.find('key').text
                 modified = c.find('lastmodified').text
-                size = c.find('size').text
+                size = int(c.find('size').text)
 
                 etag_hex = c.find('etag').text.replace('"', '')
                 etag_bin = binascii.unhexlify(etag_hex)
@@ -118,21 +118,35 @@ class Bucket(object):
         self.sync_website()      
 
     def _sync_keys(self, rsync_only=False):
-        if 'rsync' in self.__dict__:
-            rs_out = rsync(self.key_factory, **self.rsync)
-            unmodified = rs_out['unmodified']
-        else:
-            unmodified = [k['name'] for k in utils.list_bucket(self.conn, self.name)]
 
-        for k,v in self.redirects:
-            log.info("creating redirect from {} to {}".format(k, v))
-            headers = {'x-amz-website-redirect-location': v}
-            self.conn.make_request('PUT', self.name, k, headers=headers, data=None)
+        unmodified = {k['name'] for k in self.get_remote_keys()}
+
+        ignore = [k for k,v in self.redirects]
+
+        if 'rsync' in self.__dict__:
+            for rs_config in self.rsync:
+
+                matcher = utils.Matcher(
+                    patterns=rs_config.pop('patterns', None),
+                    ignore_patterns=rs_config.pop('ignore_patterns', None),
+                    regexes=rs_config.pop('regexes', None),
+                    ignore_regexes=rs_config.pop('ignore_regexes', None),
+                )
+
+                rs_out = rsync(self, matcher=matcher, **rs_config)
+
+                not_unmodified = set(rs_out['modified'] + rs_out['new'] + rs_out['removed'])
+                unmodified -= not_unmodified
 
         if not rsync_only and self.key_factory is not None:
             for k in unmodified:
                 key = self.key_factory.make_key(k)
                 key.sync()
+
+        for k,v in self.redirects:
+            log.info("creating redirect from {} to {}".format(k, v))
+            headers = {'x-amz-website-redirect-location': v}
+            self.conn.make_request('PUT', self.name, k, headers=headers, data=None)
 
     # Individual syncing methods
 
