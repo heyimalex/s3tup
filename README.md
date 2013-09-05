@@ -54,6 +54,7 @@ logging | | The logging configuration of the bucket. Valid values: Either a stri
 notification | | The notification configuration of the bucket. Valid values: Either a string xml notification configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTnotification.html) page) or `None` which will delete the notification configuration for this bucket all together.
 policy | | The policy set on this bucket. Valid values: Either a string json policy (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/dev/AccessPolicyLanguage_HowToWritePolicies.html) page) or `None` which will delete the policy from this bucket all together.
 tagging | | The tagging configuration of the bucket. Valid values: Either a string xml tagging configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTtagging.html) page) or `None` which will delete all tags from this bucket.
+versioning | | Boolean value that says wether to enable or disable versioning.
 key_config | | Takes a list of key configuration dicts and applies them to all of the applicable keys in the bucket. See section Key Configuration for details.
 rsync | | Takes an rsync configuration dict and "rsyncs" a folder with the bucket. See section Rsync Configuration for details.
 redirects | [ ] | Takes a list of [key, redirect location] pairs and will create a zero byte object at `key` that redirects to whatever redirect location you specify.

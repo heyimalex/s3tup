@@ -33,9 +33,9 @@ BUCKET_ATTRS = (
     'region',
     'rsync',
     'tagging',
+    'versioning',
     'website',
     'redirects',
     #'acl',
     #'request_payment',
-    #'versioning',
 )

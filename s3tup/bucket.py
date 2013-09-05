@@ -59,13 +59,13 @@ class Bucket(object):
 
         # TODO- implement all of these methods
         # self.sync_acl()
-        # self.sync_versioning()
         self.sync_cors()
         self.sync_lifecycle()
         self.sync_logging()
         self.sync_notification()
         self.sync_policy()
         self.sync_tagging()
+        self.sync_versioning()
         self.sync_website()
 
         try: # create key factory from key_config if it's set
@@ -152,6 +152,18 @@ class Bucket(object):
                 self.conn.make_request('PUT', self.name, None, 'tagging', data=self.tagging)
             else:
                 self.conn.make_request('DELETE', self.name, None, 'tagging')
+        except AttributeError: pass
+
+    def sync_versioning(self):
+        try:
+            if self.versioning:
+                status = 'Enabled'
+            else:
+                status = 'Suspended'
+            data = '<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\
+                      <Status>{}</Status>\
+                    </VersioningConfiguration>'.format(status)
+            self.conn.make_request('PUT', self.name, None, 'versioning', data=data)
         except AttributeError: pass
 
     def sync_website(self):
