@@ -42,7 +42,7 @@ def rsync(key_factory, src='', delete=False, patterns=None,
             return self.local_md5 == self.remote_md5
         def rsync(self):
             key = key_factory.make_key(self.name)
-            key.rsync(self.local_path)
+            key.rsync(open(self.local_path, 'rb'))
         def __lt__(self, other):
             return self.name < other.name
 

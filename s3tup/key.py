@@ -117,13 +117,14 @@ class Key(object):
         self.conn.make_request('PUT', self.bucket, self.name, headers=headers)
         self.sync_acl()
 
-    def rsync(self, filename):
-        log.info("uploading key '{}' from '{}'...".format(self.name, filename))
+    def rsync(self, flo):
+        log.info("uploading key '{}'...".format(self.name))
 
+        data = flo.read()
+        print data
         headers = self.headers
-        headers['content-md5'] = utils.file_md5(filename)
-        headers['content-length'] = os.path.getsize(filename)
-        data = open(filename, 'rb').read()
+        headers['content-length'] = os.fstat(flo.fileno()).st_size
+        
         self.conn.make_request('PUT', self.bucket, self.name, headers=headers, 
                                 data=data)
         self.sync_acl()
