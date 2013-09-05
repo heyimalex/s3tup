@@ -15,9 +15,14 @@ class BucketFactory(object):
         bucket_name = kwargs.pop('bucket')
 
         if conn is None:
-            access_key_id = kwargs.pop('access_key_id')
-            secret_access_key = kwargs.pop('secret_access_key')
-            conn = Connection(access_key_id, secret_access_key)
+            try:
+                access_key_id = kwargs.pop('access_key_id')
+                secret_access_key = kwargs.pop('secret_access_key')
+                conn = Connection(access_key_id, secret_access_key)
+            except KeyError:
+                raise Exception("You must either supply a Connection object\
+                                 through the conn parameter or an access_key_id\
+                                 and secret_access_key pair.")
 
         if 'key_config' in kwargs:
             key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
@@ -45,12 +50,40 @@ class Bucket(object):
                 raise TypeError("Bucket.__init__() got an unexpected keyword\
                                  argument '{}'".format(attr))
 
+    def __iter__(self):
+        return iter(self.list())
+
+    def list(self):
+        more = True
+        params = {}
+        while more:
+            r = self.conn.make_request('GET', self.name, params=params)
+            soup = BeautifulSoup(r.text)
+            root = soup.find('listbucketresult')
+            
+            for c in root.find_all('contents'):
+                key = c.find('key').text
+                size = c.find('size').text
+                
+                etag_hex = c.find('etag').text.replace('"', '')
+                etag_bin = binascii.unhexlify(etag_hex)
+                etag = binascii.b2a_base64(etag_bin).strip()
+                
+                yield {'name': key, 'etag': etag, 'size': size}
+                marker = key
+
+            more = root.find('istruncated').text == 'true'
+            params = {'marker': marker}
+
     def sync(self, rsync_only=False):
-        self._sync_bucket(rsync_only)
-
-    def _sync_bucket(self, rsync_only=False):
-
         log.info("syncing bucket '{}'...".format(self.name))
+
+        self._sync_bucket()
+        self._sync_keys(rsync_only)
+
+        log.info("bucket '{}' sucessfully synced!\n".format(self.name))
+
+    def _sync_bucket(self):
 
         # create bucket
         headers = {}
@@ -73,30 +106,24 @@ class Bucket(object):
         self.sync_policy()
         self.sync_tagging()
         self.sync_versioning()
-        self.sync_website()
+        self.sync_website()      
 
+    def _sync_keys(self, rsync_only=False):
         if 'rsync' in self.__dict__:
             rs_out = rsync(self.key_factory, **self.rsync)
             unmodified = rs_out['unmodified']
         else:
             unmodified = [k['name'] for k in utils.list_bucket(self.conn, self.name)]
 
-        try:
-            for k,v in self.redirects:
-                log.info("creating redirect from {} to {}".format(k, v))
-                headers = {'x-amz-website-redirect-location': v}
-                self.conn.make_request('PUT', self.name, k, headers=headers, data=None)
-        except AttributeError: pass
+        for k,v in self.redirects:
+            log.info("creating redirect from {} to {}".format(k, v))
+            headers = {'x-amz-website-redirect-location': v}
+            self.conn.make_request('PUT', self.name, k, headers=headers, data=None)
 
         if not rsync_only and self.key_factory is not None:
             for k in unmodified:
                 key = self.key_factory.make_key(k)
                 key.sync()
-
-        log.info("bucket '{}' sucessfully synced!\n".format(self.name))
-
-    def _sync_keys(self):
-        pass
 
     # Individual syncing methods
 
