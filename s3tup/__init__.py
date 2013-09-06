@@ -16,14 +16,6 @@ def s3tup(config, access_key_id=None, secret_access_key=None, rsync_only=False,)
     log.info('**** s3tup ****')
     config = yaml.load(file(config))
 
-    if access_key_id is None:
-        try: access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-        except KeyError: raise Exception('You must supply an aws access key id.')
-
-    if secret_access_key is None:
-        try: secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-        except KeyError: raise Exception('You must supply an aws secret access key.')
-
     conn = Connection(access_key_id, secret_access_key)
     bf = BucketFactory()
     for c in config:

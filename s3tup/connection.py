@@ -13,11 +13,12 @@ from requests.structures import CaseInsensitiveDict
 
 log = logging.getLogger('s3tup.connection')
 
-stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
 stats_lock = Lock()
+stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
 
 class S3Exception(Exception):
     pass
+
 
 class Connection(object):
 
@@ -98,7 +99,7 @@ class Connection(object):
         s = Session()
         req = Request(method, url, data=data, headers=headers).prepare()
 
-        # Logging stuff
+        # Log request data
         log.debug('{} {}'.format(method, url))
         log.debug('headers:')
         for k in sorted(req.headers.iterkeys()):
@@ -108,6 +109,7 @@ class Connection(object):
         resp = s.send(req)
         log.debug('response: {}\n'.format(resp.status_code))
 
+        # Update stats
         with stats_lock:
             stats[method.upper()] += 1
         

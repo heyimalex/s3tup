@@ -1,11 +1,8 @@
 from fnmatch import fnmatch
 from base64 import b64encode
+import hashlib
 import os
 import re
-import hashlib
-import binascii
-
-from bs4 import BeautifulSoup
 
 class Matcher(object):
     

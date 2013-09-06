@@ -14,7 +14,6 @@ log = logging.getLogger('s3tup.bucket')
 class BucketFactory(object):
 
     def make_bucket(self, conn=None, **kwargs):
-        
         bucket_name = kwargs.pop('bucket')
 
         if conn is None:
@@ -34,7 +33,7 @@ class BucketFactory(object):
 
         bucket = Bucket(conn, bucket_name, key_factory, **kwargs)
         return bucket
-        
+
 
 class Bucket(object):
 
@@ -43,8 +42,6 @@ class Bucket(object):
         self.name = name
 
         self.key_factory = key_factory
-
-        # set defaults for required attributes
         self.redirects = kwargs.pop('redirects', [])
 
         for attr in kwargs:
@@ -57,25 +54,20 @@ class Bucket(object):
     def get_remote_keys(self, prefix=None):
         more = True
         marker = None
-        while more:
+        while more is True:
             params = {'marker': marker, 'prefix': prefix}
             r = self.conn.make_request('GET', self.name, params=params)
-            soup = BeautifulSoup(r.text)
-            root = soup.find('listbucketresult')
-            
+            root = BeautifulSoup(r.text).find('listbucketresult')
             for c in root.find_all('contents'):
                 key = c.find('key').text
+                marker = key
                 modified = c.find('lastmodified').text
                 size = int(c.find('size').text)
-
                 etag_hex = c.find('etag').text.replace('"', '')
                 etag_bin = binascii.unhexlify(etag_hex)
                 etag = binascii.b2a_base64(etag_bin).strip()
-                
                 yield {'name': key, 'etag': etag, 'size': size,
                        'modified': modified}
-                marker = key
-
             more = root.find('istruncated').text == 'true'
 
     def make_key(self, key_name):

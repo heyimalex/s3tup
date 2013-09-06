@@ -1,15 +1,15 @@
 KEY_ATTRS = (
+    'acl',
     'cache_control',
+    'canned_acl',
     'content_disposition',
     'content_encoding',
     'content_type',
     'content_language',
-    'expires',
-    'reduced_redundancy',
-    'acl',
-    'canned_acl',
     'encrypt',
+    'expires',
     'metadata',
+    'reduced_redundancy',
 )
 
 KEY_HEADERS = (
@@ -35,5 +35,4 @@ BUCKET_ATTRS = (
     'versioning',
     'website',
     'redirects',
-    #'request_payment',
 )

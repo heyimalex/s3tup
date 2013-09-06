@@ -1,5 +1,4 @@
 import logging
-
 import os
 
 import utils
@@ -9,10 +8,10 @@ log = logging.getLogger('s3tup.rsync')
 def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
 
     log.info("rsyncing folder '{}' with bucket '{}'...".format(src, os.path.join(bucket.name, dest)))
-
     all_keys = {}
 
     class RsyncKey(object):
+
         def __init__(self, name):
             self.name = name
             self.remote = False
@@ -53,12 +52,11 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
             key = bucket.make_key(self.name)
             key.rsync(open(self.local_path, 'rb'))
 
+
     # Local keys
     for relpath in utils.os_walk_iter(src):
-
         if not matcher.match(relpath):
             break
-
         key_name = os.path.join(dest, relpath)
         local_path = os.path.join(src, relpath)
 
@@ -88,6 +86,7 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
     modified_keys = []
     unmodified_keys = []
 
+    # Sort every key into appropriate list
     for k in sorted(all_keys.iterkeys()):
         if all_keys[k].new:
             new_keys.append(k)
@@ -98,20 +97,23 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
         elif all_keys[k].unmodified:
             unmodified_keys.append(k)
 
+    # Delete removed keys if delete is True
     if delete is True:
         delete_keys(bucket, removed_keys)
     else:
         unmodified_keys.extend(removed_keys)
         removed_keys = []
 
+    # Upload new keys
     for k in new_keys:
-        log.info('new: {}, uploading now...'.format(k)) 
         key = all_keys[k]
+        log.info("new: '{}', uploading now from '{}'...".format(k, key.local_path))
         key.rsync()
 
+    # Upload modified keys
     for k in modified_keys:
         key = all_keys[k]
-        log.info('modified: {}, uploading now...'.format(k)) 
+        log.info("modified: '{}', uploading now from '{}'...".format(k, key.local_path))
         key.rsync()
 
     log.info('rsync complete!')
