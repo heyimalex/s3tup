@@ -1,5 +1,6 @@
 from base64 import b64encode
 from email.utils import formatdate
+import os
 import logging
 import hashlib
 import hmac
@@ -17,7 +18,16 @@ class S3Exception(Exception):
 
 class Connection(object):
 
-    def __init__(self, access_key_id, secret_access_key):
+    def __init__(self, access_key_id=None, secret_access_key=None):
+
+        if access_key_id is None:
+            try: access_key_id = os.environ['AWS_ACCESS_KEY_ID']
+            except KeyError: raise Exception('You must supply an aws access key id.')
+
+        if secret_access_key is None:
+            try: secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
+            except KeyError: raise Exception('You must supply an aws secret access key.')
+
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
 
