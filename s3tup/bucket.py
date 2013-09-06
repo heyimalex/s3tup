@@ -4,7 +4,7 @@ import binascii
 from bs4 import BeautifulSoup
 
 from connection import Connection
-from key import KeyFactory
+from key import KeyFactory, Key
 from rsync import rsync
 import utils
 import constants
@@ -24,8 +24,8 @@ class BucketFactory(object):
                 conn = Connection(access_key_id, secret_access_key)
             except KeyError:
                 raise Exception("You must either supply a Connection object\
-                                 through the conn parameter or an access_key_id\
-                                 and secret_access_key pair.")
+                                 through the conn parameter or supply an\
+                                 access_key_id and secret_access_key pair.")
 
         if 'key_config' in kwargs:
             key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
@@ -115,7 +115,7 @@ class Bucket(object):
         self.sync_policy()
         self.sync_tagging()
         self.sync_versioning()
-        self.sync_website()      
+        self.sync_website()
 
     def _sync_keys(self, rsync_only=False):
 
@@ -160,29 +160,29 @@ class Bucket(object):
                 log.info("setting default bucket acl...")
                 headers = {"x-amz-acl":"private"}
                 data = None
-            self.conn.make_request('PUT', self.name, None, 'acl', data=data, headers=headers)
+            return self.conn.make_request('PUT', self.name, None, 'acl', data=data, headers=headers)
         except AttributeError: pass
 
     def sync_cors(self):
         try:
             if self.cors is not None:
                 log.info("setting cors configuration...")
-                self.conn.make_request('PUT', self.name, None, 'cors',
-                                       data=self.cors)
+                return self.conn.make_request('PUT', self.name, None, 'cors',
+                                              data=self.cors)
             else:
                 log.info("deleting cors configuration...")
-                self.conn.make_request('DELETE', self.name, None, 'cors')
+                return self.conn.make_request('DELETE', self.name, None, 'cors')
         except AttributeError: pass
 
     def sync_lifecycle(self):
         try:
             if self.lifecycle is not None:
                 log.info("setting lifecycle configuration...")
-                self.conn.make_request('PUT', self.name, None, 'lifecycle',
-                                       data=self.lifecycle)
+                return self.conn.make_request('PUT', self.name, None, 'lifecycle',
+                                              data=self.lifecycle)
             else:
                 log.info("deleting lifecycle configuration...")
-                self.conn.make_request('DELETE', self.name, None, 'lifecycle')
+                return self.conn.make_request('DELETE', self.name, None, 'lifecycle')
         except AttributeError: pass
 
     def sync_logging(self):
@@ -194,7 +194,7 @@ class Bucket(object):
                 log.info("deleting logging configuration...")
                 data = '<?xml version="1.0" encoding="UTF-8"?>\
                         <BucketLoggingStatus xmlns="http://doc.s3.amazonaws.com/2006-03-01" />'
-            self.conn.make_request('PUT', self.name, None, 'logging', data=data)
+            return self.conn.make_request('PUT', self.name, None, 'logging', data=data)
         except AttributeError: pass
 
     def sync_notification(self):
@@ -205,27 +205,27 @@ class Bucket(object):
             else:
                 log.info("deleting notification configuration...")
                 data = '<NotificationConfiguration />'
-            self.conn.make_request('PUT', self.name, None, 'notification', data=data)
+            return self.conn.make_request('PUT', self.name, None, 'notification', data=data)
         except AttributeError: pass
 
     def sync_policy(self):
         try:
             if self.policy is not None:
                 log.info("setting bucket policy...")
-                self.conn.make_request('PUT', self.name, None, 'policy', data=self.policy)
+                return self.conn.make_request('PUT', self.name, None, 'policy', data=self.policy)
             else:
                 log.info("deleting bucket policy...")
-                self.conn.make_request('DELETE', self.name, None, 'policy')
+                return self.conn.make_request('DELETE', self.name, None, 'policy')
         except AttributeError: pass
 
     def sync_tagging(self):
         try:
             if self.tagging is not None:
                 log.info("setting bucket tags...")
-                self.conn.make_request('PUT', self.name, None, 'tagging', data=self.tagging)
+                return self.conn.make_request('PUT', self.name, None, 'tagging', data=self.tagging)
             else:
                 log.info("deleting bucket tags...")
-                self.conn.make_request('DELETE', self.name, None, 'tagging')
+                return self.conn.make_request('DELETE', self.name, None, 'tagging')
         except AttributeError: pass
 
     def sync_versioning(self):
@@ -239,16 +239,16 @@ class Bucket(object):
             data = '<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\
                       <Status>{}</Status>\
                     </VersioningConfiguration>'.format(status)
-            self.conn.make_request('PUT', self.name, None, 'versioning', data=data)
+            return self.conn.make_request('PUT', self.name, None, 'versioning', data=data)
         except AttributeError: pass
 
     def sync_website(self):
         try:
             if self.website is not None:
                 log.info("setting website configuration...")
-                self.conn.make_request('PUT', self.name, None, 'website',
+                return self.conn.make_request('PUT', self.name, None, 'website',
                                        data=self.website)
             else:
                 log.info("deleting website configuration...")
-                self.conn.make_request('DELETE', self.name, None, 'website')
+                return self.conn.make_request('DELETE', self.name, None, 'website')
         except AttributeError: pass
