@@ -1,29 +1,41 @@
 import logging
 import os
 
-import yaml
+from connection import Connection, stats, stats_lock
+from bucket import make_bucket
+from exception import ConfigParseError, AwsCredentialNotFound
 
-from connection import Connection
-from bucket import BucketFactory
-
+# Silence requests logger
 requests_log = logging.getLogger("requests")
 requests_log.setLevel(logging.WARNING)
 
 log = logging.getLogger('s3tup')
 
-def s3tup(config, access_key_id=None, secret_access_key=None, rsync_only=False,):
+def s3tup(config, access_key_id=None, secret_access_key=None,
+          rsync_only=False):
 
     log.info('**** s3tup ****')
-    config = yaml.load(file(config))
+    try:
+        if isinstance(config, basestring):
+            import yaml
+            config = yaml.load(file(config))
+        elif isinstance(config, file):
+            import yaml
+            config = yaml.load(config)
+    except Exception as e:
+        raise ConfigParseError(e)
+   
+    if isinstance(config, dict):
+        config = [config,]
 
-    conn = Connection(access_key_id, secret_access_key)
-    bf = BucketFactory()
+    try: conn = Connection(access_key_id, secret_access_key)
+    except AwsCredentialNotFound: conn = None
     for c in config:
-        b = bf.make_bucket(conn, **c)
+        b = make_bucket(conn, **c)
         b.sync(rsync_only)
     
-    from connection import stats
     log.info('request totals:')
-    for k,v in stats.iteritems():
-        if v > 0:
-            log.info('- {}: {}'.format(k,v))
+    with stats_lock:
+        for k,v in stats.iteritems():
+            if v > 0:
+                log.info('- {}: {}'.format(k,v))

@@ -11,14 +11,12 @@ from bs4 import BeautifulSoup
 from requests import Session, Request
 from requests.structures import CaseInsensitiveDict
 
+from exception import S3Error, SecretAccessKeyNotFound, AccessKeyIdNotFound
+
 log = logging.getLogger('s3tup.connection')
 
 stats_lock = Lock()
 stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
-
-class S3Exception(Exception):
-    pass
-
 
 class Connection(object):
 
@@ -26,11 +24,13 @@ class Connection(object):
 
         if access_key_id is None:
             try: access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-            except KeyError: raise Exception('You must supply an aws access key id.')
+            except KeyError:
+                raise AccessKeyIdNotFound('Connection object could not be created: You must either supply the access_key_id parameter or set the AWS_ACCESS_KEY_ID environment variable.')
 
         if secret_access_key is None:
             try: secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-            except KeyError: raise Exception('You must supply an aws secret access key.')
+            except KeyError:
+                raise SecretAccessKeyNotFound('Connection object could not be created: You must either supply the secret_access_key parameter or set the AWS_SECRET_ACCESS_KEY environment variable.')
 
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
@@ -124,7 +124,7 @@ class Connection(object):
 
             code = error.find('code').text
             message = error.find('message').text
-            raise S3Exception("{}: {}".format(code, message))
+            raise S3Error("{}: {}".format(code, message))
 
         return resp
 

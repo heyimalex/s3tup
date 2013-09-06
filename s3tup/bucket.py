@@ -6,33 +6,30 @@ from bs4 import BeautifulSoup
 from connection import Connection
 from key import KeyFactory, Key
 from rsync import rsync
+from exception import AwsCredentialNotFound
 import utils
 import constants
 
 log = logging.getLogger('s3tup.bucket')
 
-class BucketFactory(object):
+def make_bucket(self, conn=None, **kwargs):
+    bucket_name = kwargs.pop('bucket')
 
-    def make_bucket(self, conn=None, **kwargs):
-        bucket_name = kwargs.pop('bucket')
+    if conn is None:
+        try:
+            access_key_id = kwargs.pop('access_key_id')
+            secret_access_key = kwargs.pop('secret_access_key')
+            conn = Connection(access_key_id, secret_access_key)
+        except KeyError:
+            raise AwsCredentialNotFound("You must either supply a valid Connection object through the conn parameter or supply an access_key_id and secret_access_key pair.")
 
-        if conn is None:
-            try:
-                access_key_id = kwargs.pop('access_key_id')
-                secret_access_key = kwargs.pop('secret_access_key')
-                conn = Connection(access_key_id, secret_access_key)
-            except KeyError:
-                raise Exception("You must either supply a Connection object\
-                                 through the conn parameter or supply an\
-                                 access_key_id and secret_access_key pair.")
+    if 'key_config' in kwargs:
+        key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
+    else:
+        key_factory = None
 
-        if 'key_config' in kwargs:
-            key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
-        else:
-            key_factory = None
-
-        bucket = Bucket(conn, bucket_name, key_factory, **kwargs)
-        return bucket
+    bucket = Bucket(conn, bucket_name, key_factory, **kwargs)
+    return bucket
 
 
 class Bucket(object):
