@@ -12,7 +12,7 @@ import constants
 
 log = logging.getLogger('s3tup.bucket')
 
-def make_bucket(self, conn=None, **kwargs):
+def make_bucket(conn=None, **kwargs):
     bucket_name = kwargs.pop('bucket')
 
     if conn is None:
@@ -45,8 +45,8 @@ class Bucket(object):
             if attr in constants.BUCKET_ATTRS:
                 self.__dict__[attr] = kwargs[attr]
             else:
-                raise TypeError("Bucket.__init__() got an unexpected keyword\
-                                 argument '{}'".format(attr))
+                raise TypeError("Bucket.__init__() got an unexpected keyword"
+                                " argument '{}'".format(attr))
 
     def get_remote_keys(self, prefix=None):
         more = True
@@ -76,14 +76,7 @@ class Bucket(object):
     def sync(self, rsync_only=False):
         log.info("syncing bucket '{}'...".format(self.name))
 
-        self._sync_bucket()
-        self._sync_keys(rsync_only)
-
-        log.info("bucket '{}' sucessfully synced!\n".format(self.name))
-
-    def _sync_bucket(self):
-
-        # create bucket
+        # Create bucket
         headers = {}
         try: headers['x-amz-acl'] = self.canned_acl
         except AttributeError: pass
@@ -96,6 +89,18 @@ class Bucket(object):
             data = None
         self.conn.make_request('PUT', self.name, headers=headers, data=data)
 
+        if not rsync_only:
+            self._sync_bucket()
+
+        unmodified = self._rsync_keys()['unmodified']
+
+        if not rsync_only:
+            self._sync_keys(unmodified)
+            self._sync_redirects()
+
+        log.info("bucket '{}' sucessfully synced!\n".format(self.name))
+
+    def _sync_bucket(self):
         self.sync_acl()
         self.sync_cors()
         self.sync_lifecycle()
@@ -106,36 +111,47 @@ class Bucket(object):
         self.sync_versioning()
         self.sync_website()
 
-    def _sync_keys(self, rsync_only=False):
+    def _sync_keys(self, unmodified=[]):
+        if self.key_factory is None:
+            return
+        for k in unmodified:
+            key = self.key_factory.make_key(k)
+            key.sync()
 
-        unmodified = {k['name'] for k in self.get_remote_keys()}
-
-        ignore = [k for k,v in self.redirects]
-
-        if 'rsync' in self.__dict__:
-            for rs_config in self.rsync:
-
-                matcher = utils.Matcher(
-                    patterns=rs_config.pop('patterns', None),
-                    ignore_patterns=rs_config.pop('ignore_patterns', None),
-                    regexes=rs_config.pop('regexes', None),
-                    ignore_regexes=rs_config.pop('ignore_regexes', None),
-                )
-
-                rs_out = rsync(self, matcher=matcher, **rs_config)
-
-                not_unmodified = set(rs_out['modified'] + rs_out['new'] + rs_out['removed'])
-                unmodified -= not_unmodified
-
-        if not rsync_only and self.key_factory is not None:
-            for k in unmodified:
-                key = self.key_factory.make_key(k)
-                key.sync()
-
+    def _sync_redirects(self):
         for k,v in self.redirects:
             log.info("creating redirect from {} to {}".format(k, v))
             headers = {'x-amz-website-redirect-location': v}
-            self.conn.make_request('PUT', self.name, k, headers=headers, data=None)
+            self.conn.make_request('PUT', self.name, k, headers=headers,
+                                   data=None)
+
+    def _rsync_keys(self):
+        unmodified = {k['name'] for k in self.get_remote_keys()}
+        out = {'new': set(), 'removed': set(), 'modified': set()}
+
+        if 'rsync' not in self.__dict__:
+            out['unmodified'] = unmodified
+            return out
+
+        if isinstance(self.rsync, dict):
+            self.rsync = [self.rsync,]
+
+        for rs_config in self.rsync:
+            matcher = utils.Matcher(
+                rs_config.pop('patterns', None),
+                rs_config.pop('ignore_patterns', None),
+                rs_config.pop('regexes', None),
+                rs_config.pop('ignore_regexes', None),
+            )
+            rs_out = rsync(self, matcher=matcher, **rs_config)
+            out['new'] |= set(rs_out['new'])
+            out['removed'] |= set(rs_out['removed'])
+            out['modified'] |= set(rs_out['modified'])
+
+        unmodified -= (out['new'] | out['removed'] | out['modified'])
+        out['unmodified'] = unmodified
+
+        return out
 
     # Individual syncing methods
 
@@ -149,7 +165,8 @@ class Bucket(object):
                 log.info("setting default bucket acl...")
                 headers = {"x-amz-acl":"private"}
                 data = None
-            return self.conn.make_request('PUT', self.name, None, 'acl', data=data, headers=headers)
+            return self.conn.make_request('PUT', self.name, None, 'acl',
+                                          data=data, headers=headers)
         except AttributeError: pass
 
     def sync_cors(self):
@@ -160,18 +177,21 @@ class Bucket(object):
                                               data=self.cors)
             else:
                 log.info("deleting cors configuration...")
-                return self.conn.make_request('DELETE', self.name, None, 'cors')
+                return self.conn.make_request('DELETE', self.name, None,
+                                              'cors')
         except AttributeError: pass
 
     def sync_lifecycle(self):
         try:
             if self.lifecycle is not None:
                 log.info("setting lifecycle configuration...")
-                return self.conn.make_request('PUT', self.name, None, 'lifecycle',
+                return self.conn.make_request('PUT', self.name, None,
+                                              'lifecycle',
                                               data=self.lifecycle)
             else:
                 log.info("deleting lifecycle configuration...")
-                return self.conn.make_request('DELETE', self.name, None, 'lifecycle')
+                return self.conn.make_request('DELETE', self.name, None,
+                                             'lifecycle')
         except AttributeError: pass
 
     def sync_logging(self):
@@ -181,9 +201,11 @@ class Bucket(object):
                 data = self.logging
             else:
                 log.info("deleting logging configuration...")
-                data = '<?xml version="1.0" encoding="UTF-8"?>\
-                        <BucketLoggingStatus xmlns="http://doc.s3.amazonaws.com/2006-03-01" />'
-            return self.conn.make_request('PUT', self.name, None, 'logging', data=data)
+                data = """<?xml version="1.0" encoding="UTF-8"?>
+                       <BucketLoggingStatus
+                       xmlns="http://doc.s3.amazonaws.com/2006-03-01" />"""
+            return self.conn.make_request('PUT', self.name, None,
+                                          'logging', data=data)
         except AttributeError: pass
 
     def sync_notification(self):
@@ -194,27 +216,32 @@ class Bucket(object):
             else:
                 log.info("deleting notification configuration...")
                 data = '<NotificationConfiguration />'
-            return self.conn.make_request('PUT', self.name, None, 'notification', data=data)
+            return self.conn.make_request('PUT', self.name, None,
+                                          'notification', data=data)
         except AttributeError: pass
 
     def sync_policy(self):
         try:
             if self.policy is not None:
                 log.info("setting bucket policy...")
-                return self.conn.make_request('PUT', self.name, None, 'policy', data=self.policy)
+                return self.conn.make_request('PUT', self.name, None,
+                                              'policy', data=self.policy)
             else:
                 log.info("deleting bucket policy...")
-                return self.conn.make_request('DELETE', self.name, None, 'policy')
+                return self.conn.make_request('DELETE', self.name, None,
+                                              'policy')
         except AttributeError: pass
 
     def sync_tagging(self):
         try:
             if self.tagging is not None:
                 log.info("setting bucket tags...")
-                return self.conn.make_request('PUT', self.name, None, 'tagging', data=self.tagging)
+                return self.conn.make_request('PUT', self.name, None,
+                                              'tagging', data=self.tagging)
             else:
                 log.info("deleting bucket tags...")
-                return self.conn.make_request('DELETE', self.name, None, 'tagging')
+                return self.conn.make_request('DELETE', self.name, None,
+                                              'tagging')
         except AttributeError: pass
 
     def sync_versioning(self):
@@ -225,19 +252,22 @@ class Bucket(object):
             else:
                 log.info("suspending versioning...")
                 status = 'Suspended'
-            data = '<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\
-                      <Status>{}</Status>\
-                    </VersioningConfiguration>'.format(status)
-            return self.conn.make_request('PUT', self.name, None, 'versioning', data=data)
+            data = """<VersioningConfiguration
+                        xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                      <Status>{}</Status>
+                      </VersioningConfiguration>""".format(status)
+            return self.conn.make_request('PUT', self.name, None,
+                                          'versioning', data=data)
         except AttributeError: pass
 
     def sync_website(self):
         try:
             if self.website is not None:
                 log.info("setting website configuration...")
-                return self.conn.make_request('PUT', self.name, None, 'website',
-                                       data=self.website)
+                return self.conn.make_request('PUT', self.name, None,
+                                              'website', data=self.website)
             else:
                 log.info("deleting website configuration...")
-                return self.conn.make_request('DELETE', self.name, None, 'website')
+                return self.conn.make_request('DELETE', self.name, None,
+                                              'website')
         except AttributeError: pass
