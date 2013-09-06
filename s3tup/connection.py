@@ -1,5 +1,6 @@
 from base64 import b64encode
 from email.utils import formatdate
+from threading import Lock
 import os
 import logging
 import hashlib
@@ -11,7 +12,9 @@ from requests import Session, Request
 from requests.structures import CaseInsensitiveDict
 
 log = logging.getLogger('s3tup.connection')
+
 stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
+stats_lock = Lock()
 
 class S3Exception(Exception):
     pass
@@ -104,7 +107,9 @@ class Connection(object):
         # Send request
         resp = s.send(req)
         log.debug('response: {}\n'.format(resp.status_code))
-        stats[method.upper()] += 1
+
+        with stats_lock:
+            stats[method.upper()] += 1
         
         # Handle errors
         if resp.status_code/100 != 2:
