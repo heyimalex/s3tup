@@ -19,9 +19,9 @@ def make_bucket(conn=None, **kwargs):
         try:
             access_key_id = kwargs.pop('access_key_id')
             secret_access_key = kwargs.pop('secret_access_key')
-            conn = Connection(access_key_id, secret_access_key)
         except KeyError:
             raise AwsCredentialNotFound("You must either supply a valid Connection object through the conn parameter or supply an access_key_id and secret_access_key pair.")
+        conn = Connection(access_key_id, secret_access_key)
 
     if 'key_config' in kwargs:
         key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
@@ -82,9 +82,9 @@ class Bucket(object):
         except AttributeError: pass
         try:
             data = """<CreateBucketConfiguration 
-                       xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                      <LocationConstraint>{}</LocationConstraint> 
-                      </CreateBucketConfiguration >""".format(self.region)
+                   xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                   <LocationConstraint>{}</LocationConstraint> 
+                   </CreateBucketConfiguration >""".format(self.region)
         except AttributeError:
             data = None
         self.conn.make_request('PUT', self.name, headers=headers, data=data)
@@ -156,118 +156,124 @@ class Bucket(object):
     # Individual syncing methods
 
     def sync_acl(self):
-        try:
-            if self.acl is not None:
-                log.info("setting bucket acl...")
-                headers = {}
-                data = self.acl
-            else:
-                log.info("setting default bucket acl...")
-                headers = {"x-amz-acl":"private"}
-                data = None
-            return self.conn.make_request('PUT', self.name, None, 'acl',
-                                          data=data, headers=headers)
-        except AttributeError: pass
+        try: acl = self.acl
+        except AttributeError: return False
+        
+        if acl is not None:
+            log.info("setting bucket acl...")
+            headers = {}
+            data = acl
+        else:
+            log.info("reverting to default bucket acl...")
+            headers = {"x-amz-acl":"private"}
+            data = None
+        return self.conn.make_request('PUT', self.name, None, 'acl',
+                                      data=data, headers=headers)
 
     def sync_cors(self):
-        try:
-            if self.cors is not None:
-                log.info("setting cors configuration...")
-                return self.conn.make_request('PUT', self.name, None, 'cors',
-                                              data=self.cors)
-            else:
-                log.info("deleting cors configuration...")
-                return self.conn.make_request('DELETE', self.name, None,
-                                              'cors')
-        except AttributeError: pass
+        try: cors = self.cors
+        except AttributeError: return False
+
+        if cors is not None:
+            log.info("setting cors configuration...")
+            return self.conn.make_request('PUT', self.name, None, 'cors',
+                                          data=self.cors)
+        else:
+            log.info("deleting cors configuration...")
+            return self.conn.make_request('DELETE', self.name, None, 'cors')
 
     def sync_lifecycle(self):
-        try:
-            if self.lifecycle is not None:
-                log.info("setting lifecycle configuration...")
-                return self.conn.make_request('PUT', self.name, None,
-                                              'lifecycle',
-                                              data=self.lifecycle)
-            else:
-                log.info("deleting lifecycle configuration...")
-                return self.conn.make_request('DELETE', self.name, None,
-                                             'lifecycle')
-        except AttributeError: pass
+        try: lifecycle = self.lifecycle
+        except AttributeError: return False
+
+        if lifecycle is not None:
+            log.info("setting lifecycle configuration...")
+            return self.conn.make_request('PUT', self.name, None,
+                                          'lifecycle', data=lifecycle)
+        else:
+            log.info("deleting lifecycle configuration...")
+            return self.conn.make_request('DELETE', self.name, None,
+                                          'lifecycle')
 
     def sync_logging(self):
-        try:
-            if self.logging is not None:
-                log.info("setting logging configuration...")
-                data = self.logging
-            else:
-                log.info("deleting logging configuration...")
-                data = """<?xml version="1.0" encoding="UTF-8"?>
-                       <BucketLoggingStatus
-                       xmlns="http://doc.s3.amazonaws.com/2006-03-01" />"""
-            return self.conn.make_request('PUT', self.name, None,
-                                          'logging', data=data)
-        except AttributeError: pass
+        try: logging = self.logging
+        except AttributeError: return False
+
+        if logging is not None:
+            log.info("setting logging configuration...")
+            data = logging
+        else:
+            log.info("deleting logging configuration...")
+            data = """<?xml version="1.0" encoding="UTF-8"?>
+                      <BucketLoggingStatus
+                      xmlns="http://doc.s3.amazonaws.com/2006-03-01" />"""
+        return self.conn.make_request('PUT', self.name, None, 'logging',
+                                      data=data)
 
     def sync_notification(self):
-        try:
-            if self.notification is not None:
-                log.info("setting notification configuration...")
-                data = self.notification
-            else:
-                log.info("deleting notification configuration...")
-                data = '<NotificationConfiguration />'
-            return self.conn.make_request('PUT', self.name, None,
-                                          'notification', data=data)
-        except AttributeError: pass
+        try: notification = self.notification
+        except AttributeError: return False
 
+        if notification is not None:
+            log.info("setting notification configuration...")
+            data = notification
+        else:
+            log.info("deleting notification configuration...")
+            data = '<NotificationConfiguration />'
+        return self.conn.make_request('PUT', self.name, None,
+                                      'notification', data=data)
     def sync_policy(self):
-        try:
-            if self.policy is not None:
-                log.info("setting bucket policy...")
-                return self.conn.make_request('PUT', self.name, None,
-                                              'policy', data=self.policy)
-            else:
-                log.info("deleting bucket policy...")
-                return self.conn.make_request('DELETE', self.name, None,
-                                              'policy')
-        except AttributeError: pass
+        try: policy = self.policy
+        except AttributeError: return False
+
+        if policy is not None:
+            log.info("setting bucket policy...")
+            return self.conn.make_request('PUT', self.name, None, 'policy',
+                                          data=policy)
+        else:
+            log.info("deleting bucket policy...")
+            return self.conn.make_request('DELETE', self.name, None,
+                                          'policy')
 
     def sync_tagging(self):
-        try:
-            if self.tagging is not None:
-                log.info("setting bucket tags...")
-                return self.conn.make_request('PUT', self.name, None,
-                                              'tagging', data=self.tagging)
-            else:
-                log.info("deleting bucket tags...")
-                return self.conn.make_request('DELETE', self.name, None,
-                                              'tagging')
-        except AttributeError: pass
+        try: tagging = self.tagging
+        except AttributeError: return False
+
+        if tagging is not None:
+            log.info("setting bucket tags...")
+            return self.conn.make_request('PUT', self.name, None, 'tagging',
+                                          data=tagging)
+        else:
+            log.info("deleting bucket tags...")
+            return self.conn.make_request('DELETE', self.name, None,
+                                          'tagging')
 
     def sync_versioning(self):
-        try:
-            if self.versioning:
-                log.info("enabling versioning...")
-                status = 'Enabled'
-            else:
-                log.info("suspending versioning...")
-                status = 'Suspended'
-            data = """<VersioningConfiguration
-                        xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                      <Status>{}</Status>
-                      </VersioningConfiguration>""".format(status)
-            return self.conn.make_request('PUT', self.name, None,
-                                          'versioning', data=data)
-        except AttributeError: pass
+        try: versioning = self.versioning
+        except AttributeError: return False
+
+        if versioning:
+            log.info("enabling versioning...")
+            status = 'Enabled'
+        else:
+            log.info("suspending versioning...")
+            status = 'Suspended'
+        data = """<VersioningConfiguration
+               xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+               <Status>{}</Status>
+               </VersioningConfiguration>""".format(status)
+        return self.conn.make_request('PUT', self.name, None, 'versioning',
+                                      data=data)
 
     def sync_website(self):
-        try:
-            if self.website is not None:
-                log.info("setting website configuration...")
-                return self.conn.make_request('PUT', self.name, None,
-                                              'website', data=self.website)
-            else:
-                log.info("deleting website configuration...")
-                return self.conn.make_request('DELETE', self.name, None,
-                                              'website')
-        except AttributeError: pass
+        try: website = self.website
+        except AttributeError: return False
+
+        if website is not None:
+            log.info("setting website configuration...")
+            return self.conn.make_request('PUT', self.name, None,
+                                          'website', data=website)
+        else:
+            log.info("deleting website configuration...")
+            return self.conn.make_request('DELETE', self.name, None,
+                                          'website')
