@@ -6,8 +6,10 @@ import utils
 log = logging.getLogger('s3tup.rsync')
 
 def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
+    bucket_url = bucket.name+'.s3.amazonaws.com'
+    log.info("rsyncing '{}'".format(os.path.abspath(src)))
+    log.info("    with '{}'...".format(os.path.join(bucket_url, dest)))
 
-    log.info("rsyncing folder '{}' with bucket '{}'...".format(src, os.path.join(bucket.name, dest)))
     all_keys = {}
 
     class RsyncKey(object):
@@ -56,7 +58,7 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
     # Local keys
     for relpath in utils.os_walk_iter(src):
         if not matcher.match(relpath):
-            break
+            continue
         key_name = os.path.join(dest, relpath)
         local_path = os.path.join(src, relpath)
 
@@ -69,7 +71,8 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
         all_keys[rsk.name] = rsk
 
     # Remote keys
-    for key in bucket.get_remote_keys(prefix=dest):
+    prefix = dest if dest != '' else None
+    for key in bucket.get_remote_keys(prefix=prefix):
         try:
             rsk = all_keys[key['name']]
         except KeyError:
@@ -88,16 +91,17 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
 
     # Sort every key into appropriate list
     for k in sorted(all_keys.iterkeys()):
-        if all_keys[k].new:
+        v = all_keys[k]
+        if v.new:
             new_keys.append(k)
-        elif all_keys[k].removed:
+        elif v.removed:
             removed_keys.append(k)
-        elif all_keys[k].modified:
+        elif v.modified:
             modified_keys.append(k)
-        elif all_keys[k].unmodified:
+        elif v.unmodified:
             unmodified_keys.append(k)
 
-    # Delete removed keys if delete is True
+    # Delete removed keys if delete
     if delete is True:
         delete_keys(bucket, removed_keys)
     else:
@@ -107,7 +111,8 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
     # Upload new keys
     for k in new_keys:
         key = all_keys[k]
-        log.info("new: '{}', uploading now from '{}'...".format(k, key.local_path))
+        log.info("new: '{}', uploading now from '{}'...".format(
+                 k, key.local_path))
         key.rsync()
 
     # Upload modified keys
@@ -135,4 +140,5 @@ def delete_keys(bucket, keys):
             log.info('removed: {}'.format(k))
             data += '<Object><Key>{}</Key></Object>\n'.format(k)
         data += '</Delete>'
-        bucket.conn.make_request('POST', bucket.name, None, 'delete', data=data)
+        bucket.conn.make_request('POST', bucket.name, None, 'delete',
+                                 data=data)
