@@ -16,11 +16,8 @@ def make_bucket(conn=None, **kwargs):
     bucket_name = kwargs.pop('bucket')
 
     if conn is None:
-        try:
-            access_key_id = kwargs.pop('access_key_id')
-            secret_access_key = kwargs.pop('secret_access_key')
-        except KeyError:
-            raise AwsCredentialNotFound("You must either supply a valid Connection object through the conn parameter or supply an access_key_id and secret_access_key pair.")
+        access_key_id = kwargs.pop('access_key_id', None)
+        secret_access_key = kwargs.pop('secret_access_key', None)
         conn = Connection(access_key_id, secret_access_key)
 
     if 'key_config' in kwargs:
@@ -28,8 +25,7 @@ def make_bucket(conn=None, **kwargs):
     else:
         key_factory = None
 
-    bucket = Bucket(conn, bucket_name, key_factory, **kwargs)
-    return bucket
+    return Bucket(conn, bucket_name, key_factory, **kwargs)
 
 
 class Bucket(object):
@@ -37,16 +33,27 @@ class Bucket(object):
     def __init__(self, conn, name, key_factory=None, **kwargs):
         self.conn = conn
         self.name = name
-
         self.key_factory = key_factory
-        self.redirects = kwargs.pop('redirects', [])
 
+        self.redirects = kwargs.pop('redirects', [])
         for attr in kwargs:
             if attr in constants.BUCKET_ATTRS:
                 self.__dict__[attr] = kwargs[attr]
             else:
                 raise TypeError("Bucket.__init__() got an unexpected keyword"
                                 " argument '{}'".format(attr))
+
+    def make_key(self, key_name):
+        """Return a properly configured Key object"""
+        if self.key_factory is None:
+            return Key(self.conn, key_name, self.name)
+        else:
+            return self.key_factory.make_key(key_name)
+
+    def make_request(self, method, params=None, data=None, headers=None):
+        """Convenience method for self.conn.make_request"""
+        return self.conn.make_request(method, self.name, None, params,
+                                      data=data, headers=headers)
 
     def get_remote_keys(self, prefix=None):
         more = True
@@ -67,23 +74,12 @@ class Bucket(object):
                        'modified': modified}
             more = root.find('istruncated').text == 'true'
 
-    def make_key(self, key_name):
-        if self.key_factory is None:
-            return Key(self.conn, key_name, self.name)
-        else:
-            return self.key_factory.make_key(key_name)
-
-    def make_request(self, method, params=None, data=None, headers=None):
-        return self.conn.make_request(method, self.name, None, params,
-                                      data=data, headers=headers)
-
     def sync(self, rsync_only=False):
         log.info("syncing bucket '{}'...".format(self.name))
 
         # Create bucket
-        headers = {}
-        try: headers['x-amz-acl'] = self.canned_acl
-        except AttributeError: pass
+        try: headers = {'x-amz-acl': self.canned_acl}
+        except AttributeError: headers = None
         try:
             data = """<CreateBucketConfiguration 
                    xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
@@ -93,18 +89,32 @@ class Bucket(object):
             data = None
         self.conn.make_request('PUT', self.name, headers=headers, data=data)
 
+        if rsync_only and 'rsync' not in self.__dict__:
+            log.warning("Running in rsync only mode with no rsync config.")
+
         if not rsync_only:
             self._sync_bucket()
 
-        unmodified = self._rsync_keys()['unmodified']
+        if not rsync_only and self.key_factory is not None:
+            before = list(self.get_remote_keys())
+        
+        self._rsync_keys()
+
+        if not rsync_only and self.key_factory is not None:
+            if 'rsync' not in self.__dict__:
+                keys = before
+            else:
+                after = list(self.get_remote_keys())
+                keys = utils.key_diff(before, after)['unmodified']
+            self._sync_keys(keys)
 
         if not rsync_only:
-            self._sync_keys(unmodified)
             self._sync_redirects()
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
 
     def _sync_bucket(self):
+        """Run all of the bucket sync methods."""
         self.sync_acl()
         self.sync_cors()
         self.sync_lifecycle()
@@ -115,28 +125,23 @@ class Bucket(object):
         self.sync_versioning()
         self.sync_website()
 
-    def _sync_keys(self, unmodified=[]):
+    def _sync_keys(self, keys=None):
         if self.key_factory is None:
             return
-        for k in unmodified:
-            key = self.key_factory.make_key(k)
+        if keys is None:
+            keys = self.get_remote_keys()
+        for k in keys:
+            key = self.make_key(k)
             key.sync()
 
     def _sync_redirects(self):
         for k,v in self.redirects:
             log.info("creating redirect from {} to {}".format(k, v))
             headers = {'x-amz-website-redirect-location': v}
-            self.conn.make_request('PUT', self.name, k, headers=headers,
-                                   data=None)
+            self.conn.make_request('PUT', self.name, k, headers=headers)
 
     def _rsync_keys(self):
-        unmodified = {k['name'] for k in self.get_remote_keys()}
-        out = {'new': set(), 'removed': set(), 'modified': set()}
-
-        if 'rsync' not in self.__dict__:
-            out['unmodified'] = unmodified
-            return out
-
+        # Accept either a dict or a list dicts
         if isinstance(self.rsync, dict):
             self.rsync = [self.rsync,]
 
@@ -147,15 +152,7 @@ class Bucket(object):
                 rs_config.pop('regexes', None),
                 rs_config.pop('ignore_regexes', None),
             )
-            rs_out = rsync(self, matcher=matcher, **rs_config)
-            out['new'] |= set(rs_out['new'])
-            out['removed'] |= set(rs_out['removed'])
-            out['modified'] |= set(rs_out['modified'])
-
-        unmodified -= (out['new'] | out['removed'] | out['modified'])
-        out['unmodified'] = unmodified
-
-        return out
+            rsync(self, matcher=matcher, **rs_config)
 
     # Individual syncing methods
 
@@ -165,13 +162,11 @@ class Bucket(object):
         
         if acl is not None:
             log.info("setting bucket acl...")
-            headers = {}
-            data = acl
+            return self.make_request('PUT', 'acl', data=acl)
         else:
             log.info("reverting to default bucket acl...")
-            headers = {"x-amz-acl":"private"}
-            data = None
-        return self.make_request('PUT', 'acl', data=data, headers=headers)
+            return self.make_request('PUT', 'acl',
+                                     headers={"x-amz-acl":"private"})
 
     def sync_cors(self):
         try: cors = self.cors
@@ -179,7 +174,7 @@ class Bucket(object):
 
         if cors is not None:
             log.info("setting cors configuration...")
-            return self.make_request('PUT', 'cors', data=self.cors)
+            return self.make_request('PUT', 'cors', data=cors)
         else:
             log.info("deleting cors configuration...")
             return self.make_request('DELETE', 'cors')
@@ -205,8 +200,8 @@ class Bucket(object):
         else:
             log.info("deleting logging configuration...")
             data = """<?xml version="1.0" encoding="UTF-8"?>
-                      <BucketLoggingStatus
-                      xmlns="http://doc.s3.amazonaws.com/2006-03-01" />"""
+                   <BucketLoggingStatus
+                   xmlns="http://doc.s3.amazonaws.com/2006-03-01"/>"""
         return self.make_request('PUT', 'logging', data=data)
 
     def sync_notification(self):
@@ -230,7 +225,7 @@ class Bucket(object):
             return self.make_request('PUT', 'policy', data=policy)
         else:
             log.info("deleting bucket policy...")
-            return self.conn.make_request('DELETE', 'policy')
+            return self.make_request('DELETE', 'policy')
 
     def sync_tagging(self):
         try: tagging = self.tagging

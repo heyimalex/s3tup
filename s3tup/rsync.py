@@ -6,6 +6,10 @@ import utils
 log = logging.getLogger('s3tup.rsync')
 
 def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
+    # Silence key logging to avoid redundant messages
+    key_log = logging.getLogger('s3tup.key')
+    key_log.setLevel(logging.WARNING)
+
     bucket_url = bucket.name+'.s3.amazonaws.com'
     log.info("rsyncing '{}'".format(os.path.abspath(src)))
     log.info("    with '{}'...".format(os.path.join(bucket_url, dest)))
@@ -121,6 +125,8 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
         log.info("modified: '{}', uploading now from '{}'...".format(k, key.local_path))
         key.rsync()
 
+    key_log.setLevel(logging.DEBUG)
+
     log.info('rsync complete!')
     log.info('{} new, {} removed, {} modified, {} unmodified'.format(
              len(new_keys), len(removed_keys), len(modified_keys),
@@ -140,5 +146,4 @@ def delete_keys(bucket, keys):
             log.info('removed: {}'.format(k))
             data += '<Object><Key>{}</Key></Object>\n'.format(k)
         data += '</Delete>'
-        bucket.conn.make_request('POST', bucket.name, None, 'delete',
-                                 data=data)
+        bucket.make_request('POST', 'delete', data=data)

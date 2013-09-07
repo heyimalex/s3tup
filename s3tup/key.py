@@ -43,8 +43,8 @@ class KeyConfigurator(object):
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
             else:
-                raise TypeError("KeyConfigurator.__init__() got an\
-                                 unexpected keyword argument'{}'"
+                raise TypeError("KeyConfigurator.__init__() got an"
+                                " unexpected keyword argument'{}'"
                                  .format(attr))
 
     def effects_key(self, key_name):
@@ -78,8 +78,8 @@ class Key(object):
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
             else:
-                raise TypeError("Key.__init__() got an unexpected keyword\
-                                 argument '{}'".format(attr))
+                raise TypeError("Key.__init__() got an unexpected keyword"
+                                " argument '{}'".format(attr))
 
     @property
     def headers(self):
@@ -137,13 +137,14 @@ class Key(object):
         self.sync_acl()
 
     def sync_acl(self):
-        headers = {}
-        data = None
-        try:
-            if self.acl is not None:
-                data = self.acl
-            else:
-                headers["x-amz-acl"] = "private"
+        try: acl = self.acl
+        except AttributeError: return False
+
+        if acl is not None:
             self.conn.make_request('PUT', self.bucket, self.name, 'acl',
-                                   data=data, headers=headers)
-        except AttributeError: pass
+                                   data=acl)
+        else:
+            self.conn.make_request('PUT', self.bucket, self.name, 'acl',
+                                   headers={'x-amz-acl': 'private'})
+        
+        

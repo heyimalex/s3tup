@@ -35,7 +35,8 @@ class Connection(object):
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
 
-    def make_request(self, method, bucket, key=None, params=None, headers={}, data=None):
+    def make_request(self, method, bucket, key=None, params=None, data=None,
+                     headers=None):
 
         # Remove params that are set to None
         if isinstance(params, dict):
@@ -46,11 +47,14 @@ class Connection(object):
         # Construct target url
         url = 'http://{}.s3.amazonaws.com'.format(bucket)
         url += '/{}'.format(key) if key is not None else '/'
-        try: url += '?{}'.format(urllib.urlencode(params))
-        except TypeError:
-            url += '?{}'.format(params) if params is not None else ''
+        if isinstance(params, dict) and len(params) > 0:
+            url += '?{}'.format(urllib.urlencode(params))
+        elif isinstance(params, basestring):
+            url += '?{}'.format(params)
 
         # Make headers case insensitive
+        if headers is None:
+            headers = {}
         headers = CaseInsensitiveDict(headers)
 
         headers['Host'] = '{}.s3.amazonaws.com'.format(bucket)
@@ -69,23 +73,24 @@ class Connection(object):
         date = formatdate(timeval=None, localtime=False, usegmt=True)
         headers['x-amz-date'] = date
 
-        # Construct canonicalized resource string
-        canonicalized_resource = '/' + bucket
-        canonicalized_resource += '/{}'.format(key) if key is not None else '/'
-        if isinstance(params, basestring):
-            canonicalized_resource += '?{}'.format(params)
-
         # Construct canonicalized amz headers string
         canonicalized_amz_headers = ''
-        amz_keys = sorted([k for k in headers.keys() if k.startswith('x-amz-')])
-        for k in amz_keys:
-            canonicalized_amz_headers += '{}:{}\n'.format(k, headers[k].strip())
+        amz_keys = [k for k in headers.iterkeys() if k.startswith('x-amz-')]
+        for k in sorted(amz_keys):
+            v = headers[k].strip()
+            canonicalized_amz_headers += '{}:{}\n'.format(k.lower(), v)
+
+        # Construct canonicalized resource string
+        canonicalized_resource = '/' + bucket
+        canonicalized_resource += '/' if key is None else '/{}'.format(key)
+        if isinstance(params, basestring):
+            canonicalized_resource += '?{}'.format(params)
 
         # Construct string to sign
         string_to_sign = method.upper() + '\n'
         string_to_sign += md5 + '\n'
         string_to_sign += content_type + '\n'
-        string_to_sign += '\n' # date is always done through x-amz-date header
+        string_to_sign += '\n' # date is always set through x-amz-date
         string_to_sign += canonicalized_amz_headers + canonicalized_resource
 
         # Create signature
@@ -93,7 +98,8 @@ class Connection(object):
         signature = b64encode(h.digest())
 
         # Set authorization header
-        headers['Authorization'] = 'AWS {}:{}'.format(self.access_key_id, signature)
+        headers['Authorization'] = 'AWS {}:{}'.format(self.access_key_id,
+                                                      signature)
 
         # Prepare Request
         s = Session()
@@ -127,4 +133,3 @@ class Connection(object):
             raise S3Error("{}: {}".format(code, message))
 
         return resp
-
