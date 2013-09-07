@@ -73,6 +73,10 @@ class Bucket(object):
         else:
             return self.key_factory.make_key(key_name)
 
+    def make_request(self, method, params=None, data=None, headers=None):
+        return self.conn.make_request(method, self.name, None, params,
+                                      data=data, headers=headers)
+
     def sync(self, rsync_only=False):
         log.info("syncing bucket '{}'...".format(self.name))
 
@@ -167,8 +171,7 @@ class Bucket(object):
             log.info("reverting to default bucket acl...")
             headers = {"x-amz-acl":"private"}
             data = None
-        return self.conn.make_request('PUT', self.name, None, 'acl',
-                                      data=data, headers=headers)
+        return self.make_request('PUT', 'acl', data=data, headers=headers)
 
     def sync_cors(self):
         try: cors = self.cors
@@ -176,11 +179,10 @@ class Bucket(object):
 
         if cors is not None:
             log.info("setting cors configuration...")
-            return self.conn.make_request('PUT', self.name, None, 'cors',
-                                          data=self.cors)
+            return self.make_request('PUT', 'cors', data=self.cors)
         else:
             log.info("deleting cors configuration...")
-            return self.conn.make_request('DELETE', self.name, None, 'cors')
+            return self.make_request('DELETE', 'cors')
 
     def sync_lifecycle(self):
         try: lifecycle = self.lifecycle
@@ -188,12 +190,10 @@ class Bucket(object):
 
         if lifecycle is not None:
             log.info("setting lifecycle configuration...")
-            return self.conn.make_request('PUT', self.name, None,
-                                          'lifecycle', data=lifecycle)
+            return self.make_request('PUT', 'lifecycle', data=lifecycle)
         else:
             log.info("deleting lifecycle configuration...")
-            return self.conn.make_request('DELETE', self.name, None,
-                                          'lifecycle')
+            return self.make_request('DELETE', 'lifecycle')
 
     def sync_logging(self):
         try: logging = self.logging
@@ -207,8 +207,7 @@ class Bucket(object):
             data = """<?xml version="1.0" encoding="UTF-8"?>
                       <BucketLoggingStatus
                       xmlns="http://doc.s3.amazonaws.com/2006-03-01" />"""
-        return self.conn.make_request('PUT', self.name, None, 'logging',
-                                      data=data)
+        return self.make_request('PUT', 'logging', data=data)
 
     def sync_notification(self):
         try: notification = self.notification
@@ -220,20 +219,18 @@ class Bucket(object):
         else:
             log.info("deleting notification configuration...")
             data = '<NotificationConfiguration />'
-        return self.conn.make_request('PUT', self.name, None,
-                                      'notification', data=data)
+        return self.make_request('PUT', 'notification', data=data)
+
     def sync_policy(self):
         try: policy = self.policy
         except AttributeError: return False
 
         if policy is not None:
             log.info("setting bucket policy...")
-            return self.conn.make_request('PUT', self.name, None, 'policy',
-                                          data=policy)
+            return self.make_request('PUT', 'policy', data=policy)
         else:
             log.info("deleting bucket policy...")
-            return self.conn.make_request('DELETE', self.name, None,
-                                          'policy')
+            return self.conn.make_request('DELETE', 'policy')
 
     def sync_tagging(self):
         try: tagging = self.tagging
@@ -241,12 +238,10 @@ class Bucket(object):
 
         if tagging is not None:
             log.info("setting bucket tags...")
-            return self.conn.make_request('PUT', self.name, None, 'tagging',
-                                          data=tagging)
+            return self.make_request('PUT', 'tagging', data=tagging)
         else:
             log.info("deleting bucket tags...")
-            return self.conn.make_request('DELETE', self.name, None,
-                                          'tagging')
+            return self.make_request('DELETE', 'tagging')
 
     def sync_versioning(self):
         try: versioning = self.versioning
@@ -262,8 +257,7 @@ class Bucket(object):
                xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
                <Status>{}</Status>
                </VersioningConfiguration>""".format(status)
-        return self.conn.make_request('PUT', self.name, None, 'versioning',
-                                      data=data)
+        return self.make_request('PUT', 'versioning', data=data)
 
     def sync_website(self):
         try: website = self.website
@@ -271,9 +265,7 @@ class Bucket(object):
 
         if website is not None:
             log.info("setting website configuration...")
-            return self.conn.make_request('PUT', self.name, None,
-                                          'website', data=website)
+            return self.make_request('PUT', 'website', data=website)
         else:
             log.info("deleting website configuration...")
-            return self.conn.make_request('DELETE', self.name, None,
-                                          'website')
+            return self.make_request('DELETE', 'website')
