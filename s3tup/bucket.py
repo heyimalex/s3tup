@@ -40,6 +40,12 @@ def make_bucket(conn=None, **kwargs):
 
 
 class Bucket(object):
+    """
+    Encapsulates configuration for an s3 bucket and its keys. It contains a
+    key_factory which handles key configuration and many attributes (listed
+    in constants.BUCKET_ATTRS) that you can set, delete, modify, and then
+    sync to s3 using the various sync methods provided.
+    """
 
     def __init__(self, conn, name, key_factory=None, **kwargs):
         self.conn = conn
@@ -73,12 +79,11 @@ class Bucket(object):
     # to avoid ambiguity. Returns dicts instead of objects for the
     # same reason.
     def get_remote_keys(self, prefix=None):
-        """Return list of dicts representing keys in this s3 bucket.
+        """Generate list of dicts representing all keys in this s3 bucket.
 
-        A generator that provides dicts with fields 'name', 'etag', 'size',
-        and 'modified' representing every key currently in this s3 bucket.
-        Paging is handled automatically. Optional str prefix param will limit
-        the results to those prefixed by it.
+        Each dict returned contains fields 'name', 'etag', 'size', and
+        'modified'. Paging is handled automatically. Optional (str)
+        prefix param will limit the results to those keys prefixed by it.
 
         """
         more = True
@@ -206,7 +211,7 @@ class Bucket(object):
     # Individual syncing methods.
     #
     # Each checks if this object has its respective attr set and, if it does,
-    # proceeds to sync that value with the s3 bucket. Each will return the s3
+    # proceeds to sync that value with the s3 bucket. Each will return s3's
     # response in the form of a requests.Response object if the attr is set,
     # and if not will return False. These map directly to the fields
     # defined in the bucket config section of the readme, so if you're

@@ -5,6 +5,7 @@ import os
 import re
 
 class Matcher(object):
+    """Matches patterns"""
     
     def __init__(self, patterns=None, ignore_patterns=None, regexes=None,
                  ignore_regexes=None):
@@ -14,6 +15,7 @@ class Matcher(object):
         self.ignore_regexes = ignore_regexes
 
     def match(self, s):
+        """Return whether this matcher matches string s"""
         # If neither patterns nor regexes is set, match everything
         matched = self.patterns is None and self.regexes is None 
 
@@ -61,24 +63,29 @@ def os_walk_iter(src):
 
 def key_diff(before, after):
     """
+    Return a dict representing the difference between two runs of
+    Bucket.get_remote_keys().
 
-    Return a dict representing the difference between two runs of Bucket.get_remote_keys(). Useful to see changes in the keys within bucket after some operation.
-
+    Useful to see changes in the keys within a bucket after some operation.
+    Ex:
         before = list(bucket.get_remote_keys())
         do_something()
-        diff = key_diff(before, list(bucket.get_remote_keys()))
-        print diff['new'] # List of new keys
-        print diff['removed'] # List of keys that have been removed
-        print diff['modified'] # List of keys that have been modified
-        print diff['unmodified'] # List of keys which have not changed
+        diff = key_diff(before, bucket.get_remote_keys())
 
-    Be sure to call list() on the result of get_remote_keys before running this; because it's a generator, it won't actually execute until you iterate through it (which, in the example above, would be after the 'after' you're trying to compare to)
+    Returned dict has fields 'new', 'removed', 'modified', and 'unmodified',
+    and each field contains a list of str key names. Size and md5 are used to
+    check for modification.
+
+    Note: Be sure that 'before' is a list and *not* the generator returned
+    by Bucket.get_remote_keys; because it's a generator, it won't actually
+    fetch them from the server until they are iterated through.
+
     """
     before_set = {k['name'] for k in before}
     after_set = {k['name'] for k in after}
 
-    before_keys = {k['name']: k for k in before}
-    after_keys = {k['name']: k for k in after}
+    before_keys = {k['name']: k for k in before if k['name'] in after_set}
+    after_keys = {k['name']: k for k in after if k['name'] in before_set}
 
     removed = before_set - after_set
     new = after_set - before_set

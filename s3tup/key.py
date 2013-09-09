@@ -75,6 +75,11 @@ class KeyConfigurator(object):
 
 
 class Key(object):
+    """
+    Encapsulates configuration for a particular s3 key. It has attributes
+    (all defined in constants.KEY_ATTRS) that you can set, delete, modify, 
+    and then sync to s3 using the sync or rsync methods.
+    """
     
     def __init__(self, conn, name, bucket_name, **kwargs):
         self.conn = conn
@@ -95,6 +100,7 @@ class Key(object):
 
     @property
     def headers(self):
+        """Return the headers associated with this key"""
         headers = {}
 
         try: headers['x-amz-acl'] = self.canned_acl
@@ -128,6 +134,7 @@ class Key(object):
         return headers
 
     def sync(self):
+        """Sync this object's configuration with its respective key on s3"""
         log.info("syncing key '{}'...".format(self.name))
 
         headers = self.headers
@@ -139,6 +146,7 @@ class Key(object):
         self.sync_acl()
 
     def rsync(self, file_like_object):
+        """Upload file_like_object to s3 with this object's configuration"""
         log.info("uploading key '{}'...".format(self.name))
 
         headers = self.headers

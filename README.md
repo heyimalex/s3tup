@@ -1,6 +1,10 @@
 # s3tup
 
-Python package that offers declarative configuration management for amazon s3.
+Python package that offers declarative configuration management and deployment for amazon s3.
+
+## Why?
+
+Because writing custom scripts for configuring and deploying to s3 through boto was a major pain. Though tools like s3sync exist, they lack robust options for configuration and you often still need some customization or outside scripting to get them to do exactly what you want.
 
 ## Installation
 
@@ -16,25 +20,27 @@ Install from source:
 
 ## Usage
 
-S3tup provides both a command line client and a python api. Simply write out a config, set your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars and run:
+S3tup can be used as a command line tool or a python library. Write out a config, set your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars and run:
 
     $ s3tup /path/to/your/config.yml
 
-positional arguments:
+Alternatively you can use s3tup as a library within python.
 
-* **config** - relative or absolute path to the config file
+```python
+from s3tup.connection import Connection
+from s3tup.bucket import Bucket
 
-optional arguments:
-- **-h, --help** - show this help message and exit
-- **--access_key_id** &lt;access_key_id&gt; - your aws access key id. optional if 'AWS_ACCESS_KEY_ID' env var is set.
-- **--secret_access_key** &lt;secret_access_key&gt; - your aws secret access key. optional if 'AWS_SECRET_ACCESS_KEY' env var is set.
-- **--rsync_only** - only sync rsynced keys
-- **-v, --verbose** - run at info log level
-- **--debug** - run at debug log level
+conn = Connection()
+b = Bucket(conn, 'test-bucket')
+b.canned_acl = 'public-read'
+b.sync()
+```
+
+Documentation here is lacking at the moment, but I'm working on it (and the source is a short read).
 
 ## Config File
 
-The s3tup configuration file is plain yaml. The base is a list of bucket configurations which are defined below. An example configuration is available [here](https://github.com/HeyImAlex/s3tup/blob/master/example.yml) to help you and I'll try and keep it as up to date as possible. For more in depth details on what exactly all of these fields do you'll need to consult the [online documentation for s3](http://docs.aws.amazon.com/AmazonS3/latest/API/APIRest.html).
+The s3tup configuration file is plain yaml. The base is a list of bucket configurations which are defined below. An example configuration is available [here](https://github.com/HeyImAlex/s3tup/blob/master/example.yml) to help you and I'll try and keep it as up to date as possible. Because s3tup is just a thin wrapper over the s3 REST api, the best way to understand what all of these options actually do is to consult the [online documentation for s3](http://docs.aws.amazon.com/AmazonS3/latest/API/APIRest.html).
 
 **Note**: Setting an option to `None` and not setting it at all are not the same thing. For many fields `None` will assert that the configuration option is not set at all.
 
@@ -55,9 +61,9 @@ logging | | The logging configuration of the bucket. Valid values: Either a stri
 notification | | The notification configuration of the bucket. Valid values: Either a string xml notification configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTnotification.html) page) or `None` which will delete the notification configuration for this bucket all together.
 policy | | The policy set on this bucket. Valid values: Either a string json policy (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/dev/AccessPolicyLanguage_HowToWritePolicies.html) page) or `None` which will delete the policy from this bucket all together.
 tagging | | The tagging configuration of the bucket. Valid values: Either a string xml tagging configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTtagging.html) page) or `None` which will delete all tags from this bucket.
-versioning | | Boolean value that says wether to enable or suspend versioning. Note: Once versioning is enabled on a bucket it cannot be disabled, only suspended.
+versioning | | Boolean value that says wether to enable or suspend versioning. Note: Once versioning is enabled on a bucket it cannot be disabled, only suspended! Any bucket that has ever had versioning enabled cannot have a lifecycle configuration set!
 key_config | | Takes a list of key configuration dicts and applies them to all of the applicable keys in the bucket. See section Key Configuration for details.
-rsync | | Takes an rsync configuration dict and "rsyncs" a folder with the bucket. See section Rsync Configuration for details.
+rsync | | Takes either an rsync configuration dict or a list of them and "rsyncs" a folder with the bucket. See section Rsync Configuration for details.
 redirects | [ ] | Takes a list of [key, redirect location] pairs and will create a zero byte object at `key` that redirects to whatever redirect location you specify.
 
 #### Key Configuration
@@ -81,12 +87,13 @@ metadata | { } | Dict of metadata headers to set on the key.
 
 #### Rsync Configuration
 
-The rsync field allows you to "rsync" a local folder with an s3 bucket. All keys that are uploaded are configured by any present key configurations. Remember that the rsync configuration definition contains the matcher fields and any keys not matched will not be rsynced. This is helpfull for ignoring certain files or folders during rsync (and basically emulates the inclue/exclude/rinclude/rexclude options of s3cmd's sync). The matching process is run on the destination key name, not the local pathname.
+The rsync field allows you to "rsync" a local folder with an s3 bucket. All keys that are uploaded are configured by any present key configurations. Remember that the rsync configuration definition contains the matcher fields and any keys not matched will not be rsynced. This is helpfull for ignoring certain files or folders during rsync (and basically emulates the inclue/exclude/rinclude/rexclude options of s3cmd's sync). The matching process is run on the local pathname relative to src.
 
 field | default | description
 :---- | :------ | :----------
 matcher fields | | See section Matcher Fields below.
 src | required | Relative or absolute path to folder to rsync. Trailing slash is not important.
+dest | '' | Optional, allows you to rsync with a specific folder on s3.
 delete | False | Option to delete keys present in the bucket that are not present locally.
 
 #### Matcher Fields
@@ -101,3 +108,28 @@ patterns | None | List of unix style patterns to include
 ignore_patterns | None | List of unix style patterns exclude
 regexes | None | List of regex patterns to include
 ignore_regexes | None | List of regex patterns exclude
+
+## Cli
+
+positional arguments:
+
+* **config** - relative or absolute path to the config file
+
+optional arguments:
+- **-h, --help** - show this help message and exit
+- **--access_key_id** &lt;access_key_id&gt; - your aws access key id. optional if 'AWS_ACCESS_KEY_ID' env var is set.
+- **--secret_access_key** &lt;secret_access_key&gt; - your aws secret access key. optional if 'AWS_SECRET_ACCESS_KEY' env var is set.
+- **--rsync_only** - only sync rsynced keys
+- **-v, --verbose** - run at info log level
+- **--debug** - run at debug log level
+
+## Problems, limitations, etc
+
+This project is in early development and still has plenty of work before being production ready...
+
+* Testing is non-existent (but it's next on my todo...)
+* Documentation is sparse
+* Can't currently handle file uploads larger than 2gb
+* Requester pays not implemented
+* Mfa delete not implemented
+* Exception handling needs work

@@ -6,14 +6,46 @@ import utils
 log = logging.getLogger('s3tup.rsync')
 
 def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
+    """Rsync a local path with an s3 bucket.
+
+    Will upload all new and modified local files from the src directory into
+    the specified bucket. It uses the key's md5 hash and size to determine
+    if it's been modified (and wheter or not to upload), and all keys
+    uploaded are properly configured by the inputed bucket.
+
+    Params:
+
+    bucket - s3tup.bucket.Bucket object. The name attribute of this object
+             is the destination bucket for this rsync and the keys that
+             rsync uses to upload are created and configured using its
+             make_key method.
+
+    src - Relative or absolute path to the local folder you want to sync.
+          Unlike actual rsyncing, trailing slash does not matter.
+
+    dest - Allows you to rsync to a certain prefix on a bucket.
+           Ex: If dest is 'assets', files of the src dir will be rsynced to
+           example-bucket.s3.amazonaws.com/assets/
+
+    delete - Whether or not to delete files in your s3 bucket that no longer
+             exist locally. When used with dest, only files in dest will be
+             deleted.
+
+    matcher - s3tup.utils.Matcher object. If the matcher does not match on
+              the local file path, that file will not be rsynced.
+
+    Returns a dict with fields 'new', 'removed', 'modified', and
+    'unmodified', and each field contains a list of key names.
+
+    """
     # Silence key logging to avoid redundant messages
     key_log = logging.getLogger('s3tup.key')
     key_log.setLevel(logging.WARNING)
 
     bucket_url = bucket.name+'.s3.amazonaws.com'
-    log.info("rsyncing '{}'".format(os.path.abspath(src)))
-    log.info("    with '{}'...".format(os.path.join(bucket_url, dest)))
-
+    log.info("rsyncing '{}'".format(os.path.join(bucket_url, dest)))
+    log.info("    with '{}'...".format(os.path.abspath(src)))
+    
     all_keys = {}
 
     class RsyncKey(object):
@@ -115,14 +147,13 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
     # Upload new keys
     for k in new_keys:
         key = all_keys[k]
-        log.info("new: '{}', uploading now from '{}'...".format(
-                 k, key.local_path))
+        log.info("new: '{}', uploading now...".format(k))
         key.rsync()
 
     # Upload modified keys
     for k in modified_keys:
         key = all_keys[k]
-        log.info("modified: '{}', uploading now from '{}'...".format(k, key.local_path))
+        log.info("modified: '{}', uploading now...".format(k))
         key.rsync()
 
     key_log.setLevel(logging.DEBUG)
@@ -138,6 +169,13 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
             'unmodified': unmodified_keys}
 
 def delete_keys(bucket, keys):
+    """Delete a list of keys from a specified bucket.
+
+    Bucket is a s3tup.bucket.Bucket object and keys is a list of str
+    key names to be deleted. S3's delete operation has a limit of
+    1000 keys per request so this method handles paging as well.
+
+    """
     for i in xrange(0, len(keys), 1000):
         data = """<?xml version="1.0" encoding="UTF-8"?>
                   <Delete>
