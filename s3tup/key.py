@@ -18,7 +18,7 @@ class KeyFactory(object):
     def __init__(self, configs=[]):
         self.configurators = []
         for c in configs:
-            self.configurators.append(self.make_key_configurator(c))
+            self.add_key_configurator(**c)
 
     def add_key_configurator(self, **kwargs):
         """Add a configurator to this factory.
