@@ -1,3 +1,4 @@
+from multiprocessing.pool import ThreadPool
 import logging
 import binascii
 
@@ -35,7 +36,6 @@ def make_bucket(conn=None, **kwargs):
 
     if conn is None:
         conn = Connection()
-        
 
     if 'key_config' in kwargs:
         key_factory = KeyFactory(kwargs.pop('key_config'))
@@ -59,12 +59,12 @@ class Bucket(object):
         self.key_factory = key_factory
 
         self.redirects = kwargs.pop('redirects', [])
-        for attr in kwargs:
-            if attr in constants.BUCKET_ATTRS:
-                self.__dict__[attr] = kwargs[attr]
+        for k,v in kwargs.iteritems():
+            if k in constants.BUCKET_ATTRS:
+                self.__dict__[k] = v
             else:
                 raise TypeError("Bucket.__init__() got an unexpected keyword"
-                                " argument '{}'".format(attr))
+                                " argument '{}'".format(k))
 
     def make_key(self, key_name):
         """Return a properly configured Key object."""
@@ -185,9 +185,23 @@ class Bucket(object):
             return
         if keys is None:
             keys = [k['name'] for k in self.get_remote_keys()]
-        for k in keys:
+
+        key_log = logging.getLogger('s3tup.key')
+        key_log.setLevel(logging.WARNING)
+
+        log.info('syncing all keys...')
+
+        def internal_sync_key(k):
             key = self.make_key(k)
             key.sync()
+            log.info("key '{}' sucessfully synced!".format(k))
+
+        total_keys = len(keys)
+        thread_count = total_keys if total_keys < 100 else 100
+        pool = ThreadPool(processes=thread_count)
+        pool.map(internal_sync_key, keys)
+
+        key_log.setLevel(logging.DEBUG)
 
     def sync_redirects(self):
         """Create all redirects defined in self.redirects"""
