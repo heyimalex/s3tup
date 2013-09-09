@@ -16,20 +16,26 @@ def make_bucket(conn=None, **kwargs):
     """Return a properly configured Bucket object from a s3tup configuration.
 
     Takes every kwarg detailed in the bucket config section of the readme.
-    Also takes an optional Connection object as the first parameter. If one
-    isn't provided, it will attempt to grab credentials from the input
-    kwargs ('access_key_id' and 'secret_access_key') and, if that doesn't
-    work, the Connection object constructor will try to read them from your
-    env vars.
+    Also takes an optional Connection object as the first parameter. If the
+    'access_key_id' and 'secret_access_key' kwargs are not set, this
+    connection will be used in the bucket returned. If no connection object
+    is passed, it will just call the default Connection constructor which
+    will attempt to read your credentials from your env vars.
 
     """
 
     bucket_name = kwargs.pop('bucket')
 
-    if conn is None:
-        access_key_id = kwargs.pop('access_key_id', None)
-        secret_access_key = kwargs.pop('secret_access_key', None)
+    try:
+        access_key_id = kwargs.pop('access_key_id')
+        secret_access_key = kwargs.pop('secret_access_key')
         conn = Connection(access_key_id, secret_access_key)
+    except KeyError:
+        pass
+
+    if conn is None:
+        conn = Connection()
+        
 
     if 'key_config' in kwargs:
         key_factory = KeyFactory(kwargs.pop('key_config'))
