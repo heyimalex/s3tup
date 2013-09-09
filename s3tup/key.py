@@ -5,6 +5,8 @@ import os
 import utils
 import constants
 
+
+
 log = logging.getLogger('s3tup.key')
 
 class KeyFactory(object):
@@ -96,7 +98,7 @@ class Key(object):
                 self.__dict__[k] = v
             else:
                 raise TypeError("Key.__init__() got an unexpected keyword"
-                                " argument '{}'".format(attr))
+                                " argument '{}'".format(k))
 
     @property
     def headers(self):
