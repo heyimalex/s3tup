@@ -13,6 +13,17 @@ import constants
 log = logging.getLogger('s3tup.bucket')
 
 def make_bucket(conn=None, **kwargs):
+    """Return a properly configured Bucket object from a s3tup configuration.
+
+    Takes every kwarg detailed in the bucket config section of the readme.
+    Also takes an optional Connection object as the first parameter. If one
+    isn't provided, it will attempt to grab credentials from the input
+    kwargs ('access_key_id' and 'secret_access_key') and, if that doesn't
+    work, the Connection object constructor will try to read them from your
+    env vars.
+
+    """
+
     bucket_name = kwargs.pop('bucket')
 
     if conn is None:
@@ -21,7 +32,7 @@ def make_bucket(conn=None, **kwargs):
         conn = Connection(access_key_id, secret_access_key)
 
     if 'key_config' in kwargs:
-        key_factory = KeyFactory(conn, bucket_name, kwargs.pop('key_config'))
+        key_factory = KeyFactory(kwargs.pop('key_config'))
     else:
         key_factory = None
 
@@ -44,18 +55,32 @@ class Bucket(object):
                                 " argument '{}'".format(attr))
 
     def make_key(self, key_name):
-        """Return a properly configured Key object"""
+        """Return a properly configured Key object."""
         if self.key_factory is None:
             return Key(self.conn, key_name, self.name)
         else:
-            return self.key_factory.make_key(key_name)
+            return self.key_factory.make_key(self.conn, key_name, self.name)
 
     def make_request(self, method, params=None, data=None, headers=None):
-        """Convenience method for self.conn.make_request"""
+        """
+        Convenience method for self.conn.make_request; has the bucket and
+        key fields already filled in.
+        """
         return self.conn.make_request(method, self.name, None, params,
                                       data=data, headers=headers)
 
+    # Named get_remote_keys instead of just overriding __iter__
+    # to avoid ambiguity. Returns dicts instead of objects for the
+    # same reason.
     def get_remote_keys(self, prefix=None):
+        """Return list of dicts representing keys in this s3 bucket.
+
+        A generator that provides dicts with fields 'name', 'etag', 'size',
+        and 'modified' representing every key currently in this s3 bucket.
+        Paging is handled automatically. Optional str prefix param will limit
+        the results to those prefixed by it.
+
+        """
         more = True
         marker = None
         while more is True:
@@ -75,9 +100,17 @@ class Bucket(object):
             more = root.find('istruncated').text == 'true'
 
     def sync(self, rsync_only=False):
+        """Sync everything.
+
+        Takes every applicable attribute set on this Bucket object and
+        configures its respective s3 bucket (defined by self.name) to match
+        it. Optional rsync only mode will only run rsync (no setting bucket
+        configuration, no syncing unmodified keys, no making redirects).
+
+        """
         log.info("syncing bucket '{}'...".format(self.name))
 
-        # Create bucket
+        # Create the bucket
         try: headers = {'x-amz-acl': self.canned_acl}
         except AttributeError: headers = None
         try:
@@ -93,27 +126,29 @@ class Bucket(object):
             log.warning("Running in rsync only mode with no rsync config.")
 
         if not rsync_only:
-            self._sync_bucket()
+            self.sync_bucket()
 
+        # Get the key list before we rsync so we can run diff after and only
+        # sync unmodified keys.
         if not rsync_only and self.key_factory is not None:
             before = list(self.get_remote_keys())
         
-        self._rsync_keys()
+        self.rsync_keys()
 
         if not rsync_only and self.key_factory is not None:
             if 'rsync' not in self.__dict__:
-                keys = before
+                keys = [k['name'] for k in before]
             else:
                 after = list(self.get_remote_keys())
                 keys = utils.key_diff(before, after)['unmodified']
-            self._sync_keys(keys)
+            self.sync_keys(keys)
 
         if not rsync_only:
-            self._sync_redirects()
+            self.sync_redirects()
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
 
-    def _sync_bucket(self):
+    def sync_bucket(self):
         """Run all of the bucket sync methods."""
         self.sync_acl()
         self.sync_cors()
@@ -125,36 +160,57 @@ class Bucket(object):
         self.sync_versioning()
         self.sync_website()
 
-    def _sync_keys(self, keys=None):
+    def sync_keys(self, keys=None):
+        """Sync every key in keys.
+
+        Keys should be a list of key names. Will not run if self.key_factory
+        is None as that implies no key config is set on this object (and it
+        would just restore every key to its default). If the keys param is
+        not provided, it will run on all keys currently in the s3 bucket. 
+
+        """
+
         if self.key_factory is None:
             return
         if keys is None:
-            keys = self.get_remote_keys()
+            keys = [k['name'] for k in self.get_remote_keys()]
         for k in keys:
             key = self.make_key(k)
             key.sync()
 
-    def _sync_redirects(self):
+    def sync_redirects(self):
+        """Create all redirects defined in self.redirects"""
         for k,v in self.redirects:
             log.info("creating redirect from {} to {}".format(k, v))
             headers = {'x-amz-website-redirect-location': v}
             self.conn.make_request('PUT', self.name, k, headers=headers)
 
-    def _rsync_keys(self):
-        # Accept either a dict or a list dicts
-        if isinstance(self.rsync, dict):
-            self.rsync = [self.rsync,]
+    def rsync_keys(self):
+        """Run rsync for every rsync config in self.rsync"""
+        try: rsync_configs = self.rsync
+        except AttributeError: return False
 
-        for rs_config in self.rsync:
+        # Accept either a dict or a list of dicts
+        if isinstance(rsync_configs, dict):
+            rsync_configs = [rsync_configs,]
+
+        for cfg in rsync_configs:
             matcher = utils.Matcher(
-                rs_config.pop('patterns', None),
-                rs_config.pop('ignore_patterns', None),
-                rs_config.pop('regexes', None),
-                rs_config.pop('ignore_regexes', None),
+                cfg.pop('patterns', None),
+                cfg.pop('ignore_patterns', None),
+                cfg.pop('regexes', None),
+                cfg.pop('ignore_regexes', None),
             )
-            rsync(self, matcher=matcher, **rs_config)
+            rsync(self, matcher=matcher, **cfg)
 
-    # Individual syncing methods
+    # Individual syncing methods.
+    #
+    # Each checks if this object has its respective attr set and, if it does,
+    # proceeds to sync that value with the s3 bucket. Each will return the s3
+    # response in the form of a requests.Response object if the attr is set,
+    # and if not will return False. These map directly to the fields
+    # defined in the bucket config section of the readme, so if you're
+    # looking for details on what values are allowed check there.
 
     def sync_acl(self):
         try: acl = self.acl
@@ -199,9 +255,9 @@ class Bucket(object):
             data = logging
         else:
             log.info("deleting logging configuration...")
-            data = """<?xml version="1.0" encoding="UTF-8"?>
-                   <BucketLoggingStatus
-                   xmlns="http://doc.s3.amazonaws.com/2006-03-01"/>"""
+            data = '<?xml version="1.0" encoding="UTF-8"?>\
+                    <BucketLoggingStatus \
+                    xmlns="http://doc.s3.amazonaws.com/2006-03-01"/>'
         return self.make_request('PUT', 'logging', data=data)
 
     def sync_notification(self):
@@ -248,10 +304,10 @@ class Bucket(object):
         else:
             log.info("suspending versioning...")
             status = 'Suspended'
-        data = """<VersioningConfiguration
-               xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-               <Status>{}</Status>
-               </VersioningConfiguration>""".format(status)
+        data = '<VersioningConfiguration \
+                xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\
+                <Status>{}</Status>\
+                </VersioningConfiguration>'.format(status)
         return self.make_request('PUT', 'versioning', data=data)
 
     def sync_website(self):

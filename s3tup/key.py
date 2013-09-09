@@ -8,26 +8,36 @@ import constants
 log = logging.getLogger('s3tup.key')
 
 class KeyFactory(object):
+    """
+    Basically just a container for KeyConfigurators. make_key will create a
+    key based on the input parameters and then run each configurator on it
+    sequentially, returning a fully configured key ready for sync.
 
-    def __init__(self, conn, bucket_name, configs=[]):
-        self.conn = conn
-        self.bucket_name = bucket_name
+    """
 
+    def __init__(self, configs=[]):
         self.configurators = []
         for c in configs:
             self.configurators.append(self.make_key_configurator(c))
 
-    def make_key_configurator(self, config):
-        matcher = utils.Matcher(
-            config.pop('patterns', None),
-            config.pop('ignore_patterns', None),
-            config.pop('regexes', None),
-            config.pop('ignore_regexes', None),
-        )
-        return KeyConfigurator(matcher=matcher, **config)
+    def add_key_configurator(self, **kwargs):
+        """Add a configurator to this factory.
 
-    def make_key(self, key_name):
-        key = Key(self.conn, key_name, self.bucket_name)
+        kwargs are everything in constants.KEY_ATTRS plus the matcher fields:
+        'patterns', 'ignore_patterns', 'regexes', and 'ignore_regexes'.
+
+        """
+        matcher = utils.Matcher(
+            kwargs.pop('patterns', None),
+            kwargs.pop('ignore_patterns', None),
+            kwargs.pop('regexes', None),
+            kwargs.pop('ignore_regexes', None),
+        )
+        self.configurators.append(KeyConfigurator(matcher=matcher, **kwargs))
+
+    def make_key(self, conn, key_name, bucket_name):
+        """Return a properly configured key"""
+        key = Key(conn, key_name, bucket_name)
         for c in self.configurators:
             if c.effects_key(key.name):
                 key = c.configure(key)
@@ -48,10 +58,12 @@ class KeyConfigurator(object):
                                  .format(attr))
 
     def effects_key(self, key_name):
+        """Return whether this configurator effects key_name"""
         try: return self.matcher.match(key_name)
         except AttributeError: return True
 
     def configure(self, key):
+        """Return the input key with all configurations applied"""
         for attr in constants.KEY_ATTRS:
             if attr in self.__dict__ and attr != 'metadata':
                 key.__dict__[attr] = self.__dict__[attr]
@@ -67,7 +79,7 @@ class Key(object):
     def __init__(self, conn, name, bucket_name, **kwargs):
         self.conn = conn
         self.name = name
-        self.bucket = bucket_name
+        self.bucket_name = bucket_name
 
         # Set defaults for required attributes
         self.reduced_redundancy = kwargs.pop('reduced_redundancy', False)
@@ -119,10 +131,10 @@ class Key(object):
         log.info("syncing key '{}'...".format(self.name))
 
         headers = self.headers
-        headers['x-amz-copy-source'] = '/' + self.bucket + '/' + self.name
+        headers['x-amz-copy-source'] = '/'+self.bucket_name+'/'+self.name
         headers['x-amz-metadata-directive'] = 'REPLACE'
 
-        self.conn.make_request('PUT', self.bucket, self.name,
+        self.conn.make_request('PUT', self.bucket_name, self.name,
                                headers=headers)
         self.sync_acl()
 
@@ -132,7 +144,7 @@ class Key(object):
         headers = self.headers
         data = file_like_object.read()
 
-        self.conn.make_request('PUT', self.bucket, self.name,
+        self.conn.make_request('PUT', self.bucket_name, self.name,
                                headers=headers, data=data)
         self.sync_acl()
 
@@ -141,10 +153,10 @@ class Key(object):
         except AttributeError: return False
 
         if acl is not None:
-            self.conn.make_request('PUT', self.bucket, self.name, 'acl',
+            self.conn.make_request('PUT', self.bucket_name, self.name, 'acl',
                                    data=acl)
         else:
-            self.conn.make_request('PUT', self.bucket, self.name, 'acl',
+            self.conn.make_request('PUT', self.bucket_name, self.name, 'acl',
                                    headers={'x-amz-acl': 'private'})
         
         
