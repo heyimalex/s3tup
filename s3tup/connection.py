@@ -106,15 +106,18 @@ class Connection(object):
         req = Request(method, url, data=data, headers=headers).prepare()
 
         # Log request data
-        log.debug('{} {}'.format(method, url))
-        log.debug('headers:')
+        # Combine into a single message so we don't have to bother with
+        # locking to make lines appear together
+        log_message = '{} {}\n'.format(method, url)
+        log_message += 'headers:'
         for k in sorted(req.headers.iterkeys()):
-            log.debug(' {}: {}'.format(k, req.headers[k]))
+            log_message += '\n {}: {}'.format(k, req.headers[k])
+        log.debug(log_message)
 
         # Send request
         resp = s.send(req)
-        log.debug('response: {}\n'.format(resp.status_code))
-
+        log.debug('response: {} ({} {})'.format(resp.status_code, 
+                                                    method, url))
         # Update stats
         with stats_lock:
             stats[method.upper()] += 1
