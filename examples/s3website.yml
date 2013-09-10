@@ -1,0 +1,39 @@
+# Example configuration for configuring and deploying a static website to s3.
+#
+# Assumes that your assets are all stored in /static, that all of your html,
+# css, and js are gzipped, and that all keys without extensions should be
+# interpreted as html (so you can use example.com/about instead of
+# about.html).
+#
+# Remember that s3tup is a configuration library only; gzipping,
+# compressing, removing .html from non-index files, etc, all needs to be
+# done in your own deploy scripts before s3tup runs.
+---
+- bucket: example-bucket
+  canned_acl: public-read
+  rsync:
+    src: path/to/site
+    delete: true
+    ignore_patterns: ['.*', '*.scss']
+  key_config:
+    # Make all keys public-read and use rrs
+    - canned_acl: public-read
+      reduced_redundancy: true
+    # Set long cache control on all assets
+    - patterns: ['static/*']
+      cache_control: 'max-age=32850000'
+    # Shorter cache control for all pages
+    - ignore_patterns: ['static/*']
+      cache_control: 'max-age=3600, must-revalidate'
+    # Set gzip content type headers on all gzipped files
+    - patterns: ['*.js', '*.css', '*.html', '*.xml']
+      regexes: ['^[^.]+$']
+      content_encoding: 'gzip'
+    # Set content type header to html on all files without extensions
+    - regexes: ['^[^.]+$']
+      content_type: 'text/html'
+  website: |
+    <WebsiteConfiguration xmlns='http://s3.amazonaws.com/doc/2006-03-01/'>
+    <IndexDocument><Suffix>index.html</Suffix></IndexDocument>
+    <ErrorDocument><Key>404</Key></ErrorDocument>
+    </WebsiteConfiguration>

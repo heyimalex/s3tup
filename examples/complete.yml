@@ -1,0 +1,103 @@
+# Ridiculous example with many config options set for no good reason
+# But may be good for reference...
+---
+- bucket: example-bucket
+  region: us-west-1 
+  canned_acl: public-read
+  rsync:
+    # Rsync all files in some/folder with the bucket
+    - src: some/folder
+    # Place all files in /my/special/bucket that start with 'special' in
+    # example-bucket.s3.amazonaws.com/specialfiles/
+    - src: my/special/files
+      dest: specialfiles/
+      delete: true
+      patterns: ['special*']
+  redirects:
+    # Make example-bucket.s3.amazonaws.com/example redirect to example.com
+    - ['example', 'http://www.example.com/']
+  key_config:
+    # Make all keys public-read, reduced redundancy, and encrypted
+    - canned_acl: public-read
+      reduced_redundancy: true
+      encrypt: true
+    # Make all files with html or css extension have a gzip content encoding
+    # and expire on December 25, 2015
+    - patterns: ['*.html', '*.css']
+      content_encoding: gzip
+      expires: "Thu, 25 Dec 2015 16:00:00 GMT"
+    # Make all .py files be interpreted as plaintext
+    - patterns: ['*.py']
+      content_type: text/plain
+  website: |
+    <WebsiteConfiguration xmlns='http://s3.amazonaws.com/doc/2006-03-01/'>
+    <IndexDocument><Suffix>index.html</Suffix></IndexDocument>
+    <ErrorDocument><Key>error.html</Key></ErrorDocument>
+    </WebsiteConfiguration>
+  cors: |
+    <CORSConfiguration>
+     <CORSRule>
+       <AllowedOrigin>http://www.example.com</AllowedOrigin>
+       <AllowedMethod>PUT</AllowedMethod>
+       <AllowedMethod>POST</AllowedMethod>
+       <AllowedMethod>DELETE</AllowedMethod>
+       <AllowedHeader>*</AllowedHeader>
+     </CORSRule>
+     <CORSRule>
+       <AllowedOrigin>*</AllowedOrigin>
+       <AllowedMethod>GET</AllowedMethod>
+     </CORSRule>
+    </CORSConfiguration>
+  logging: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <BucketLoggingStatus xmlns="http://doc.s3.amazonaws.com/2006-03-01">
+      <LoggingEnabled>
+        <TargetBucket>example-logs</TargetBucket>
+        <TargetPrefix>example_bucket_access_log-/</TargetPrefix>
+        <TargetGrants>
+          <Grant>
+            <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:type="AmazonCustomerByEmail">
+              <EmailAddress>alex@heyimalex.com</EmailAddress>
+            </Grantee>
+            <Permission>READ</Permission>
+          </Grant>
+        </TargetGrants>
+      </LoggingEnabled>
+    </BucketLoggingStatus>
+  tagging: |
+    <Tagging><TagSet>
+        <Tag>
+          <Key>Project</Key>
+          <Value>Project One</Value>
+        </Tag>
+        <Tag>
+          <Key>User</Key>
+          <Value>jsmith</Value>
+        </Tag>
+    </TagSet></Tagging>
+  versioning: true
+  lifecycle: ~ # Can't be set if versioning is true
+  notification: |
+    <NotificationConfiguration> 
+       <TopicConfiguration>
+           <Topic>arn:aws:sns:us-east-1:123456789012:myTopic</Topic>
+           <Event>s3:ReducedRedundancyLostObject</Event>
+       </TopicConfiguration>
+    </NotificationConfiguration>
+  policy: |
+    {
+    "Version":"2008-10-17",
+    "Id":"aaaa-bbbb-cccc-dddd",
+    "Statement" : [
+        {
+            "Effect":"Allow",
+            "Sid":"1", 
+            "Principal" : {
+                "AWS":["111122223333","444455556666"]
+            },
+            "Action":["s3:*"],
+            "Resource":"arn:aws:s3:::bucket/*"
+        }
+     ] 
+    }

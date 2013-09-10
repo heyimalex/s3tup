@@ -20,9 +20,18 @@ Install from source:
 
 ## Usage
 
-S3tup can be used as a command line tool or a python library. Write out a config, set your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars and run:
+S3tup can be used as a command line tool or a python library. Just write out a config file
+
+    ---
+    - bucket: example-bucket
+      rsync:
+        src: /path/to/folder
+
+Set your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars and then run:
 
     $ s3tup /path/to/your/config.yml
+
+Easy as that! The configuration file can be as simple or robust as you need, and there are a few example in the repo to help you out.
 
 Alternatively you can use s3tup as a library within python.
 
