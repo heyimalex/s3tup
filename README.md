@@ -31,7 +31,7 @@ Set your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars and then run:
 
     $ s3tup /path/to/your/config.yml
 
-Easy as that! The configuration file can be as simple or robust as you need, and there are a few example in the repo to help you out.
+Easy as that! The configuration file can be as simple or robust as you need, and there are a few examples in the repo to help you out.
 
 Alternatively you can use s3tup as a library within python.
 
