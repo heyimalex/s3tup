@@ -125,10 +125,13 @@ class Bucket(object):
         try: headers = {'x-amz-acl': self.canned_acl}
         except AttributeError: headers = None
         try:
-            data = """<CreateBucketConfiguration 
-                   xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                   <LocationConstraint>{}</LocationConstraint> 
-                   </CreateBucketConfiguration >""".format(self.region)
+            if self.region.strip() != '' and self.region is not None:
+                data = """<CreateBucketConfiguration 
+                        xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                        <LocationConstraint>{}</LocationConstraint> 
+                        </CreateBucketConfiguration >""".format(self.region)
+            else:
+                data = None
         except AttributeError:
             data = None
         self.conn.make_request('PUT', self.name, headers=headers, data=data)
