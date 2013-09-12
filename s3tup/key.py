@@ -61,7 +61,7 @@ class KeyConfigurator(object):
 
     def effects_key(self, key_name):
         """Return whether this configurator effects key_name"""
-        try: return self.matcher.match(key_name)
+        try: return self.matcher.matches(key_name)
         except AttributeError: return True
 
     def configure(self, key):

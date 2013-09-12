@@ -5,7 +5,15 @@ import os
 import re
 
 class Matcher(object):
-    """Matches patterns"""
+    """Matches strings based on patterns
+
+    Internally the matcher object has a list of unix style patterns to match
+    and to ignore, and a list of regexes to match and to ignore. Each of
+    these are tested against the string 's' in the matches method. Ignore
+    has the highest precedence. If both patterns and regexes are False, the
+    object assumes that the match is True (though the ignore lists can still
+    overpower this assumption).
+    """
     
     def __init__(self, patterns=[], ignore_patterns=[], regexes=[],
                  ignore_regexes=[]):
@@ -14,7 +22,7 @@ class Matcher(object):
         self.regexes = regexes
         self.ignore_regexes = ignore_regexes
 
-    def match(self, s):
+    def matches(self, s):
         """Return whether this matcher matches string s"""
         # If neither patterns nor regexes is set, match everything
         matched = not self.patterns and not self.regexes

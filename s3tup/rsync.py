@@ -93,7 +93,7 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
 
     # Local keys
     for relpath in utils.os_walk_iter(src):
-        if not matcher.match(relpath):
+        if not matcher.matches(relpath):
             continue
         key_name = os.path.join(dest, relpath)
         local_path = os.path.join(src, relpath)
