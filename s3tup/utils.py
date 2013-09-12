@@ -100,7 +100,7 @@ def key_diff(before, after):
     modified = set()
     unmodified = set()
     for k in (before_set & after_set):
-        if before_keys[k]['etag'] == after_keys[k]['etag'] and \
+        if before_keys[k]['md5'] == after_keys[k]['md5'] and \
            before_keys[k]['size'] == after_keys[k]['size']:
             unmodified.add(k)
         else:
