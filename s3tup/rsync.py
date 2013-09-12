@@ -101,7 +101,7 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
         rsk = RsyncKey(key_name)
         rsk.local = True
         rsk.local_path = local_path
-        rsk.local_md5 = utils.file_md5(local_path)
+        rsk.local_md5 = utils.file_md5(open(local_path, 'rb'))
         rsk.local_size = os.path.getsize(local_path)
 
         all_keys[rsk.name] = rsk
@@ -115,7 +115,7 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
             rsk = RsyncKey(key['name'])
 
         rsk.remote = True
-        rsk.remote_md5 = key['etag']
+        rsk.remote_md5 = key['md5']
         rsk.remote_size = key['size']
 
         all_keys[rsk.name] = rsk

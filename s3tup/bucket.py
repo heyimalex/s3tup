@@ -87,7 +87,7 @@ class Bucket(object):
     def get_remote_keys(self, prefix=None):
         """Generate list of dicts representing all keys in this s3 bucket.
 
-        Each dict returned contains fields 'name', 'etag', 'size', and
+        Each dict returned contains fields 'name', 'md5', 'size', and
         'modified'. Paging is handled automatically. Optional (str)
         prefix param will limit the results to those keys prefixed by it.
 
@@ -103,10 +103,10 @@ class Bucket(object):
                 marker = key
                 modified = c.find('lastmodified').text
                 size = int(c.find('size').text)
-                etag_hex = c.find('etag').text.replace('"', '')
-                etag_bin = binascii.unhexlify(etag_hex)
-                etag = binascii.b2a_base64(etag_bin).strip()
-                yield {'name': key, 'etag': etag, 'size': size,
+                md5_hex = c.find('etag').text.replace('"', '')
+                md5_bin = binascii.unhexlify(md5_hex)
+                md5 = binascii.b2a_base64(md5_bin).strip()
+                yield {'name': key, 'md5': md5, 'size': size,
                        'modified': modified}
             more = root.find('istruncated').text == 'true'
 
