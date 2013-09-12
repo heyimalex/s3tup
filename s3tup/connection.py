@@ -11,7 +11,10 @@ from bs4 import BeautifulSoup
 from requests import Session, Request
 from requests.structures import CaseInsensitiveDict
 
-from exception import S3Error, SecretAccessKeyNotFound, AccessKeyIdNotFound
+from exception import S3ResponseError
+from exception import AccessKeyIdNotFound
+from exception import SecretAccessKeyNotFound
+                      
 
 log = logging.getLogger('s3tup.connection')
 
@@ -20,7 +23,7 @@ stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
 
 class Connection(object):
 
-    def __init__(self, access_key_id=None, secret_access_key=None):
+    def __init__(self, access_key_id, secret_access_key):
 
         if access_key_id is None:
             try: access_key_id = os.environ['AWS_ACCESS_KEY_ID']
@@ -133,6 +136,6 @@ class Connection(object):
 
             code = error.find('code').text
             message = error.find('message').text
-            raise S3Error("{}: {}".format(code, message))
+            raise S3ResponseError("{}: {}".format(code, message))
 
         return resp

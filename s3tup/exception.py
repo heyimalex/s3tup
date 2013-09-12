@@ -1,4 +1,4 @@
-class S3Error(Exception):
+class S3ResponseError(Exception):
     pass
 
 class ConfigParseError(Exception):
