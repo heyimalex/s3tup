@@ -6,7 +6,7 @@ KEY_ATTRS = (
     'content_encoding',
     'content_type',
     'content_language',
-    'encrypt',
+    'encrypted',
     'expires',
     'metadata',
     'reduced_redundancy',

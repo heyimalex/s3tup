@@ -90,7 +90,7 @@ class Key(object):
 
         # Set defaults for required attributes
         self.reduced_redundancy = kwargs.pop('reduced_redundancy', False)
-        self.encrypt = kwargs.pop('encrypt', False)
+        self.encrypted = kwargs.pop('encrypted', False)
         self.metadata = kwargs.pop('metadata', {})
 
         for k,v in kwargs.iteritems():
@@ -114,7 +114,7 @@ class Key(object):
         except AttributeError: pass
 
         try: 
-            if self.encrypt:
+            if self.encrypted:
                 headers['x-amz-server-side-encryption'] = 'AES256'
         except AttributeError: pass
 
