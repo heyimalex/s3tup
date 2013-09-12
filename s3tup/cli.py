@@ -6,7 +6,7 @@ from s3tup import s3tup
 parser = argparse.ArgumentParser(description='s3tup')
 parser.add_argument(
 	'config',
-	help='path to configuration file'
+	help='path to your configuration file'
 	)
 parser.add_argument(
 	'--access_key_id',
@@ -19,29 +19,35 @@ parser.add_argument(
 parser.add_argument(
 	'--rsync_only',
 	action='store_true',
-	help='only run rsync, do not sync other keys'
+	help='run in rsync only mode'
 )
 verbosity_group = parser.add_mutually_exclusive_group()
 verbosity_group.add_argument(
 	"-v",
 	"--verbose",
 	action="store_true",
-    help="run in verbose mode"
+    help="increase output verbosity"
 )
 verbosity_group.add_argument(
-	"--debug",
+	"-q",
+	"--quiet",
 	action="store_true",
-    help="run in debug mode"
+    help="silence all output"
 )
 
 def main():
 	args = parser.parse_args()
 
-	if args.debug:
+	if args.quiet:
+		# Silence all logging
+		pass
+	elif args.verbose:
+		# Verbose mode, log level = debug
 		logging.basicConfig(format="%(levelname)s: %(message)s",
 							level=logging.DEBUG)
-	elif args.verbose:
+	else:
+		# Default, log level = info
 		logging.basicConfig(format="%(message)s", level=logging.INFO)
-
+	
 	s3tup(args.config, args.access_key_id, args.secret_access_key,
 		  args.rsync_only)

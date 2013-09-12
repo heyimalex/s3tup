@@ -23,7 +23,7 @@ stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
 
 class Connection(object):
 
-    def __init__(self, access_key_id, secret_access_key):
+    def __init__(self, access_key_id=None, secret_access_key=None):
 
         if access_key_id is None:
             try: access_key_id = os.environ['AWS_ACCESS_KEY_ID']

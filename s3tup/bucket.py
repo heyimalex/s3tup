@@ -192,17 +192,16 @@ class Bucket(object):
         key_log = logging.getLogger('s3tup.key')
         key_log.setLevel(logging.WARNING)
 
+        if len(keys) < 1:
+            log.info('no keys need to be synced!')
+            return
+
         log.info('syncing all keys...')
 
-        def internal_sync_key(k):
+        for k in keys:
             key = self.make_key(k)
             key.sync()
             log.info("key '{}' sucessfully synced!".format(k))
-
-        total_keys = len(keys)
-        thread_count = total_keys if total_keys < 100 else 100
-        pool = ThreadPool(processes=thread_count)
-        pool.map(internal_sync_key, keys)
 
         key_log.setLevel(logging.DEBUG)
 
