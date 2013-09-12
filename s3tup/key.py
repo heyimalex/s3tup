@@ -5,8 +5,6 @@ import os
 import utils
 import constants
 
-
-
 log = logging.getLogger('s3tup.key')
 
 class KeyFactory(object):
@@ -57,7 +55,7 @@ class KeyConfigurator(object):
             else:
                 raise TypeError("KeyConfigurator.__init__() got an"
                                 " unexpected keyword argument'{}'"
-                                 .format(attr))
+                                 .format(k))
 
     def effects_key(self, key_name):
         """Return whether this configurator effects key_name"""
