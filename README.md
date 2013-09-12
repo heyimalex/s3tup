@@ -83,7 +83,7 @@ field | default | description
 :---- | :------ | :----------
 matcher fields | | See section Matcher Fields below.
 reduced_redundancy | False | Boolean option to use reduced redundancy storage.
-encrypt | False | Boolean option to use server side encryption.
+encrypted | False | Boolean option to use server side encryption.
 canned_acl | | The [canned acl](http://docs.aws.amazon.com/AmazonS3/latest/dev/ACLOverview.html#CannedACL) for the key.
 acl |  | String xml acl policy for this key.
 cache_control | None | String value of the cache-control header.
@@ -126,19 +126,18 @@ positional arguments:
 
 optional arguments:
 - **-h, --help** - show this help message and exit
-- **--access_key_id** &lt;access_key_id&gt; - your aws access key id. optional if 'AWS_ACCESS_KEY_ID' env var is set.
-- **--secret_access_key** &lt;secret_access_key&gt; - your aws secret access key. optional if 'AWS_SECRET_ACCESS_KEY' env var is set.
+- **--access_key_id** &lt;access_key_id&gt; - your aws access key id
+- **--secret_access_key** &lt;secret_access_key&gt; - your aws secret access key
 - **--rsync_only** - only sync rsynced keys
-- **-v, --verbose** - run at info log level
-- **--debug** - run at debug log level
+- **-v, --verbose** - increase output verbosity
+- **-q, --quiet** - silence all output
 
-## Problems, limitations, etc
+## TODO
 
 This project is in early development and still has plenty of work before being production ready...
 
-* Testing is non-existent (but it's next on my todo...)
-* Documentation is sparse
+* Add tests
+* Improve docs
 * Can't currently handle file uploads larger than 2gb
 * Requester pays not implemented
 * Mfa delete not implemented
-* Exception handling needs work
