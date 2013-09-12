@@ -7,8 +7,8 @@ import re
 class Matcher(object):
     """Matches patterns"""
     
-    def __init__(self, patterns=None, ignore_patterns=None, regexes=None,
-                 ignore_regexes=None):
+    def __init__(self, patterns=[], ignore_patterns=[], regexes=[],
+                 ignore_regexes=[]):
         self.patterns = patterns
         self.ignore_patterns = ignore_patterns
         self.regexes = regexes
@@ -17,26 +17,26 @@ class Matcher(object):
     def match(self, s):
         """Return whether this matcher matches string s"""
         # If neither patterns nor regexes is set, match everything
-        matched = self.patterns is None and self.regexes is None 
+        matched = not self.patterns and not self.regexes
 
-        if self.patterns is not None:
+        if self.patterns:
             for pattern in self.patterns:
                 if fnmatch(s, pattern):
                     matched = True
                     break
 
-        if self.regexes is not None and matched is not True:
+        if self.regexes and matched is not True:
             for regex in self.regexes:
                 if re.search(regex, s):
                     matched = True
                     break
 
-        if self.ignore_patterns is not None and matched is True:
+        if self.ignore_patterns and matched is True:
             for pattern in self.ignore_patterns:
                 if fnmatch(s, pattern):
                     return False
 
-        if self.ignore_regexes is not None and matched is True:
+        if self.ignore_regexes and matched is True:
             for regex in self.ignore_regexes:
                 if re.search(regex, s):
                     return False
@@ -44,14 +44,13 @@ class Matcher(object):
         return matched
 
 
-def file_md5(filename):
-    """Return md5 hash of file located at filename"""
+def file_md5(f):
+    """Return md5 hash of filelike object f"""
     m = hashlib.md5()
-    with open(filename,'rb') as f:
-        while True:
-            buf=f.read(8192)
-            if not buf: break
-            m.update(buf)
+    while True:
+        buf=f.read(8192)
+        if not buf: break
+        m.update(buf)
     return b64encode(m.digest()).strip()
 
 def os_walk_iter(src):
