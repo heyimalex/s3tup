@@ -20,7 +20,7 @@
     # Make all keys public-read, reduced redundancy, and encrypted
     - canned_acl: public-read
       reduced_redundancy: true
-      encrypt: true
+      encrypted: true
     # Make all files with html or css extension have a gzip content encoding
     # and expire on December 25, 2015
     - patterns: ['*.html', '*.css']
