@@ -27,24 +27,23 @@ class Matcher(object):
         # If neither patterns nor regexes is set, match everything
         matched = not self.patterns and not self.regexes
 
-        if self.patterns:
-            for pattern in self.patterns:
-                if fnmatch(s, pattern):
-                    matched = True
-                    break
+        for pattern in self.patterns:
+            if fnmatch(s, pattern):
+                matched = True
+                break
 
-        if self.regexes and matched is not True:
+        if matched is not True:
             for regex in self.regexes:
                 if re.search(regex, s):
                     matched = True
                     break
 
-        if self.ignore_patterns and matched is True:
+        if matched is True:
             for pattern in self.ignore_patterns:
                 if fnmatch(s, pattern):
                     return False
 
-        if self.ignore_regexes and matched is True:
+        if matched is True:
             for regex in self.ignore_regexes:
                 if re.search(regex, s):
                     return False
