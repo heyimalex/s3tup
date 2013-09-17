@@ -106,15 +106,11 @@ class Key(object):
         try: headers['x-amz-acl'] = self.canned_acl
         except AttributeError: pass
 
-        try:
-            if self.reduced_redundancy:
-                headers['x-amz-storage-class'] = 'REDUCED_REDUNDANCY'
-        except AttributeError: pass
+        if self.reduced_redundancy:
+            headers['x-amz-storage-class'] = 'REDUCED_REDUNDANCY'
 
-        try: 
-            if self.encrypted:
-                headers['x-amz-server-side-encryption'] = 'AES256'
-        except AttributeError: pass
+        if self.encrypted:
+            headers['x-amz-server-side-encryption'] = 'AES256'
 
         for k, v in self.metadata.iteritems():
             headers['x-amz-meta-' + k] = v
