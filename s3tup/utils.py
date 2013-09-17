@@ -13,41 +13,36 @@ class Matcher(object):
     has the highest precedence. If both patterns and regexes are empty, the
     object assumes that the match is True (though the ignore lists can still
     overpower this assumption).
+
     """
-    
-    def __init__(self, patterns=[], ignore_patterns=[], regexes=[],
-                 ignore_regexes=[]):
-        self.patterns = patterns
-        self.ignore_patterns = ignore_patterns
-        self.regexes = regexes
-        self.ignore_regexes = ignore_regexes
+    def __init__(self, patterns=None, ignore_patterns=None, regexes=None,
+                 ignore_regexes=None):
+        self.patterns = patterns or []
+        self.ignore_patterns = ignore_patterns or []
+        self.regexes = regexes or []
+        self.ignore_regexes = ignore_regexes or []
 
     def matches(self, s):
         """Return whether this matcher matches string s"""
         # If neither patterns nor regexes is set, match everything
         matched = not self.patterns and not self.regexes
-
         for pattern in self.patterns:
             if fnmatch(s, pattern):
                 matched = True
                 break
-
-        if matched is not True:
+        if not matched:
             for regex in self.regexes:
                 if re.search(regex, s):
                     matched = True
                     break
-
-        if matched is True:
+        if matched:
             for pattern in self.ignore_patterns:
                 if fnmatch(s, pattern):
                     return False
-
-        if matched is True:
+        if matched:
             for regex in self.ignore_regexes:
                 if re.search(regex, s):
                     return False
-
         return matched
 
 

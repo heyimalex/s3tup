@@ -5,7 +5,8 @@ import utils
 
 log = logging.getLogger('s3tup.rsync')
 
-def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
+def rsync(bucket, src='', dest='', delete=False, match=None,
+          protect=None):
     """Rsync a local path with an s3 bucket.
 
     Will upload all new and modified local files from the src directory into
@@ -31,7 +32,7 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
              exist locally. When used with dest, only files in dest will be
              deleted.
 
-    matcher - s3tup.utils.Matcher object. If the matcher does not match on
+    match - s3tup.utils.Matcher object. If the matcher does not match on
               the local file path, that file will not be rsynced.
 
     Returns a dict with fields 'new', 'removed', 'modified', and
@@ -39,6 +40,8 @@ def rsync(bucket, src='', dest='', delete=False, matcher=utils.Matcher()):
 
     """
     # Silence key logging to avoid redundant messages
+
+    match = match or utils.Matcher()
     key_log = logging.getLogger('s3tup.key')
     key_log.setLevel(logging.WARNING)
 
