@@ -7,7 +7,6 @@ from bs4 import BeautifulSoup
 from connection import Connection
 from key import KeyFactory, Key
 from rsync import rsync
-from exception import AwsCredentialNotFound
 import utils
 import constants
 
@@ -180,7 +179,8 @@ class Bucket(object):
         Keys should be a list of key names. Will not run if self.key_factory
         is None as that implies no key config is set on this object (and it
         would just restore every key to its default). If the keys param is
-        not provided, it will run on all keys currently in the s3 bucket. 
+        not provided, it will run on all keys currently in the s3 bucket by
+        first calling self.get_remote_keys.
 
         """
 
@@ -189,12 +189,12 @@ class Bucket(object):
         if keys is None:
             keys = [k['name'] for k in self.get_remote_keys()]
 
-        key_log = logging.getLogger('s3tup.key')
-        key_log.setLevel(logging.WARNING)
-
         if len(keys) < 1:
             log.info('no keys need to be synced!')
             return
+
+        key_log = logging.getLogger('s3tup.key')
+        key_log.setLevel(logging.WARNING)
 
         log.info('syncing all keys...')
 
