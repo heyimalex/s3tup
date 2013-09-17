@@ -47,7 +47,7 @@ class Matcher(object):
 
 
 def file_md5(f):
-    """Return md5 hash of filelike object f"""
+    """Return base64 encoded md5 hash of filelike object f"""
     m = hashlib.md5()
     while True:
         buf=f.read(8192)
