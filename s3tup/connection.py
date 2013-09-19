@@ -11,8 +11,8 @@ from bs4 import BeautifulSoup
 from requests import Session, Request
 from requests.structures import CaseInsensitiveDict
 
-from exception import S3ResponseError, AccessKeyIdNotFound, \
-                      SecretAccessKeyNotFound            
+from s3tup.exception import S3ResponseError, AccessKeyIdNotFound, \
+                            SecretAccessKeyNotFound     
 
 log = logging.getLogger('s3tup.connection')
 

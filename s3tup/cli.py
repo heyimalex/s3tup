@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser(description='s3tup')
 parser.add_argument(
 	'config',
 	help='path to your configuration file'
-	)
+)
 parser.add_argument(
 	'--access_key_id',
 	help='your aws access key id'
