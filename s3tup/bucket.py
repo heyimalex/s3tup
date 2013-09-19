@@ -1,48 +1,12 @@
-from multiprocessing.pool import ThreadPool
 import logging
 import binascii
 
 from bs4 import BeautifulSoup
 
-from connection import Connection
-from key import KeyFactory, Key
-from rsync import rsync
-import utils
-import constants
+import s3tup.constants as constants
+import s3tup.utils as utils
 
 log = logging.getLogger('s3tup.bucket')
-
-def make_bucket(conn=None, **kwargs):
-    """Return a properly configured Bucket object from a s3tup configuration.
-
-    Takes every kwarg detailed in the bucket config section of the readme.
-    Also takes an optional Connection object as the first parameter. If the
-    'access_key_id' and 'secret_access_key' kwargs are not set, this
-    connection will be used in the bucket returned. If no connection object
-    is passed, it will just call the default Connection constructor which
-    will attempt to read your credentials from your env vars.
-
-    """
-
-    bucket_name = kwargs.pop('bucket')
-
-    try:
-        access_key_id = kwargs.pop('access_key_id')
-        secret_access_key = kwargs.pop('secret_access_key')
-        conn = Connection(access_key_id, secret_access_key)
-    except KeyError:
-        pass
-
-    if conn is None:
-        conn = Connection()
-
-    if 'key_config' in kwargs:
-        key_factory = KeyFactory(kwargs.pop('key_config'))
-    else:
-        key_factory = None
-
-    return Bucket(conn, bucket_name, key_factory, **kwargs)
-
 
 class Bucket(object):
     """
@@ -50,19 +14,21 @@ class Bucket(object):
     key_factory which handles key configuration and many attributes (listed
     in constants.BUCKET_ATTRS) that you can set, delete, modify, and then
     sync to s3 using the various sync methods provided.
+
     """
 
-    def __init__(self, conn, name, key_factory=None, **kwargs):
+    def __init__(self, conn, name, key_factory=None, rsync=None, **kwargs):
         self.conn = conn
         self.name = name
         self.key_factory = key_factory
+        self.rsync = rsync or []
 
         self.redirects = kwargs.pop('redirects', [])
         for k,v in kwargs.iteritems():
             if k in constants.BUCKET_ATTRS:
                 self.__dict__[k] = v
             else:
-                raise TypeError("Bucket.__init__() got an unexpected keyword"
+                raise TypeError("__init__() got an unexpected keyword"
                                 " argument '{}'".format(k))
 
     def make_key(self, key_name):
@@ -108,6 +74,24 @@ class Bucket(object):
                 yield {'name': key, 'md5': md5, 'size': size,
                        'modified': modified}
             more = root.find('istruncated').text == 'true'
+
+    def delete_remote_keys(self, keys):
+        """Delete a list of keys from this bucket.
+
+        Keys is a list of str key names to be deleted. S3's delete operation
+        has a limit of 1000 keys per request so this method handles paging
+        as well.
+
+        """
+        for i in xrange(0, len(keys), 1000):
+            data = """<?xml version="1.0" encoding="UTF-8"?>
+                      <Delete>
+                      <Quiet>true</Quiet>\n"""
+            for k in keys[i:i+1000]:
+                log.info('removed: {}'.format(k))
+                data += '<Object><Key>{}</Key></Object>\n'.format(k)
+            data += '</Delete>'
+            self.make_request('POST', 'delete', data=data)
 
     def sync(self, rsync_only=False):
         """Sync everything.
@@ -183,7 +167,6 @@ class Bucket(object):
         first calling self.get_remote_keys.
 
         """
-
         if self.key_factory is None:
             return
         if keys is None:
@@ -213,22 +196,9 @@ class Bucket(object):
             self.conn.make_request('PUT', self.name, k, headers=headers)
 
     def rsync_keys(self):
-        """Run rsync for every rsync config in self.rsync"""
-        try: rsync_configs = self.rsync
-        except AttributeError: return False
-
-        # Accept either a dict or a list of dicts
-        if isinstance(rsync_configs, dict):
-            rsync_configs = [rsync_configs,]
-
-        for cfg in rsync_configs:
-            matcher = utils.Matcher(
-                cfg.pop('patterns', None),
-                cfg.pop('ignore_patterns', None),
-                cfg.pop('regexes', None),
-                cfg.pop('ignore_regexes', None),
-            )
-            rsync(self, matcher=matcher, **cfg)
+        """Run rsync for every rsync in self.rsync"""
+        for rsync in self.rsync:
+            rsync.run(self)
 
     # Individual syncing methods.
     #

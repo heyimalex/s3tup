@@ -2,8 +2,8 @@ import logging
 import mimetypes
 import os
 
-import utils
-import constants
+import s3tup.utils as utils
+import s3tup.constants as constants
 
 log = logging.getLogger('s3tup.key')
 
@@ -15,54 +15,39 @@ class KeyFactory(object):
 
     """
 
-    def __init__(self, configs=[]):
-        self.configurators = []
-        for c in configs:
-            self.add_key_configurator(**c)
-
-    def add_key_configurator(self, **kwargs):
-        """Add a configurator to this factory.
-
-        kwargs are everything in constants.KEY_ATTRS plus the matcher fields:
-        'patterns', 'ignore_patterns', 'regexes', and 'ignore_regexes'.
-
-        """
-        matcher = utils.Matcher(
-            kwargs.pop('patterns', None),
-            kwargs.pop('ignore_patterns', None),
-            kwargs.pop('regexes', None),
-            kwargs.pop('ignore_regexes', None),
-        )
-        self.configurators.append(KeyConfigurator(matcher=matcher, **kwargs))
+    def __init__(self, configurators=None):
+        self.configurators = configurators or []
 
     def make_key(self, conn, key_name, bucket_name):
         """Return a properly configured key"""
         key = Key(conn, key_name, bucket_name)
+        return self.configure_key(key)
+
+    def configure_key(self, key):
         for c in self.configurators:
             if c.effects_key(key.name):
-                key = c.configure(key)
+                key = c.configure_key(key)
         return key
 
 
 class KeyConfigurator(object):
-
     def __init__(self, matcher=None, **kwargs):
         self.matcher = matcher
-
         for k, v in kwargs.iteritems():
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
             else:
-                raise TypeError("KeyConfigurator.__init__() got an"
-                                " unexpected keyword argument'{}'"
-                                 .format(k))
+                raise TypeError("__init__() got an unexpected keyword"
+                                " argument '{}'".format(k))
 
     def effects_key(self, key_name):
         """Return whether this configurator effects key_name"""
-        try: return self.matcher.matches(key_name)
-        except AttributeError: return True
+        if self.matcher is None:
+            return True
+        else:
+            return self.matcher.matches(key_name)
 
-    def configure(self, key):
+    def configure_key(self, key):
         """Return the input key with all configurations applied"""
         for attr in constants.KEY_ATTRS:
             if attr in self.__dict__ and attr != 'metadata':
@@ -79,8 +64,8 @@ class Key(object):
     Encapsulates configuration for a particular s3 key. It has attributes
     (all defined in constants.KEY_ATTRS) that you can set, delete, modify, 
     and then sync to s3 using the sync or rsync methods.
+
     """
-    
     def __init__(self, conn, name, bucket_name, **kwargs):
         self.conn = conn
         self.name = name
@@ -95,7 +80,7 @@ class Key(object):
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
             else:
-                raise TypeError("Key.__init__() got an unexpected keyword"
+                raise TypeError("__init__() got an unexpected keyword"
                                 " argument '{}'".format(k))
 
     @property

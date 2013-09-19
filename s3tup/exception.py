@@ -1,10 +1,13 @@
 class S3ResponseError(Exception):
     pass
 
+class ConfigLoadError(Exception):
+    pass
+
 class ConfigParseError(Exception):
     pass
 
-class ConfigValidationError(Exception):
+class InvalidConfigError(Exception):
     pass
 
 class AwsCredentialNotFound(Exception):
