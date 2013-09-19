@@ -7,11 +7,11 @@ import re
 class Matcher(object):
     """Matches strings based on patterns
 
-    Internally the matcher object has a list of unix style patterns to match
-    and to ignore, and a list of regexes to match and to ignore. Each of
+    Internally the matcher object has a set of unix style patterns to match
+    and to ignore, and a set of regexes to match and to ignore. Each of
     these are tested against the string 's' in the matches method. Ignore
     has the highest precedence. If both patterns and regexes are empty, the
-    object assumes that the match is True (though the ignore lists can still
+    object assumes that the match is True (though the ignore sets can still
     overpower this assumption).
 
     """
