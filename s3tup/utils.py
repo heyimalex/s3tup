@@ -17,10 +17,10 @@ class Matcher(object):
     """
     def __init__(self, patterns=None, ignore_patterns=None, regexes=None,
                  ignore_regexes=None):
-        self.patterns = patterns or []
-        self.ignore_patterns = ignore_patterns or []
-        self.regexes = regexes or []
-        self.ignore_regexes = ignore_regexes or []
+        self.patterns = patterns or set()
+        self.ignore_patterns = ignore_patterns or set()
+        self.regexes = regexes or set()
+        self.ignore_regexes = ignore_regexes or set()
 
     def matches(self, s):
         """Return whether this matcher matches string s"""
@@ -44,6 +44,18 @@ class Matcher(object):
                 if re.search(regex, s):
                     return False
         return matched
+
+    def __add__(self, other):
+        """Allow combining matchers"""
+        patterns = self.patterns | other.patterns
+        ignore_patterns = self.ignore_patterns | other.ignore_patterns
+        regexes = self.regexes | other.regexes
+        ignore_regexes = self.ignore_regexes | other.ignore_regexes
+
+        return Matcher(patterns, ignore_patterns, regexes, ignore_regexes)
+
+    def __iadd__(self, other):
+        return self.__add__(other)
 
 
 def file_md5(f):
@@ -88,16 +100,16 @@ def key_diff(before, after):
     before_keys = {k['name']: k for k in before if k['name'] in after_set}
     after_keys = {k['name']: k for k in after if k['name'] in before_set}
 
-    removed = before_set - after_set
-    new = after_set - before_set
+    removed = list(before_set-after_set)
+    new = list(after_set-before_set)
 
-    modified = set()
-    unmodified = set()
+    modified = []
+    unmodified = []
     for k in (before_set & after_set):
         if before_keys[k]['md5'] == after_keys[k]['md5'] and \
            before_keys[k]['size'] == after_keys[k]['size']:
-            unmodified.add(k)
+            unmodified.append(k)
         else:
-            modified.add(k)
+            modified.append(k)
     return {'new': new, 'removed': removed, 'modified': modified,
             'unmodified': unmodified}
