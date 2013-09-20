@@ -7,9 +7,6 @@ class ConfigLoadError(Exception):
 class ConfigParseError(Exception):
     pass
 
-class InvalidConfigError(Exception):
-    pass
-
 class AwsCredentialNotFound(Exception):
     pass
 

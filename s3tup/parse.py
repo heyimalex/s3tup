@@ -5,7 +5,7 @@ import yaml
 from s3tup.bucket import Bucket
 from s3tup.key import KeyFactory, KeyConfigurator, Key
 from s3tup.rsync import Rsync
-from s3tup.exception import ConfigParseError
+from s3tup.exception import ConfigParseError, ConfigLoadError
 
 log = logging.getLogger('s3tup.parse')
 
@@ -26,14 +26,15 @@ def load_config(config):
         try:
             config = yaml.load(file(config))
         except yaml.YAMLError as e:
-            raise ConfigParseError(e)
+            raise ConfigLoadError(e)
         except IOError:
-            raise ConfigParseError("Config file '{}' does not exist".format(config))
+            raise ConfigLoadError("Config file '{}' does not exist"
+                                  .format(config))
     elif isinstance(config, file):
         try:
             config = yaml.load(config)
         except yaml.YAMLError as e:
-            raise ConfigParseError(e)
+            raise ConfigLoadError(e)
 
     return config
 
