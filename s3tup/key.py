@@ -83,6 +83,14 @@ class Key(object):
                 raise TypeError("__init__() got an unexpected keyword"
                                 " argument '{}'".format(k))
 
+    def make_request(self, method, params=None, data=None, headers=None):
+        """
+        Convenience method for self.conn.make_request; has bucket and key
+        already filled in.
+        """
+        return self.conn.make_request(method, self.bucket_name, self.name,
+                                      params, data=data, headers=headers)
+
     @property
     def headers(self):
         """Return the headers associated with this key"""
@@ -122,8 +130,7 @@ class Key(object):
         headers['x-amz-copy-source'] = '/'+self.bucket_name+'/'+self.name
         headers['x-amz-metadata-directive'] = 'REPLACE'
 
-        self.conn.make_request('PUT', self.bucket_name, self.name,
-                               headers=headers)
+        self.make_request('PUT', headers=headers)
         self.sync_acl()
 
     def rsync(self, file_like_object):
@@ -133,8 +140,7 @@ class Key(object):
         headers = self.headers
         data = file_like_object.read()
 
-        self.conn.make_request('PUT', self.bucket_name, self.name,
-                               headers=headers, data=data)
+        self.make_request('PUT', headers=headers, data=data)
         self.sync_acl()
 
     def sync_acl(self):
@@ -142,10 +148,8 @@ class Key(object):
         except AttributeError: return False
 
         if acl is not None:
-            self.conn.make_request('PUT', self.bucket_name, self.name, 'acl',
-                                   data=acl)
+            self.make_request('PUT', 'acl', data=acl)
         else:
-            self.conn.make_request('PUT', self.bucket_name, self.name, 'acl',
-                                   headers={'x-amz-acl': 'private'})
+            self.make_request('PUT', 'acl', headers={'x-amz-acl': 'private'})
         
         
