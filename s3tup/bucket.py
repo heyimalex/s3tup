@@ -3,6 +3,7 @@ import binascii
 
 from bs4 import BeautifulSoup
 
+from s3tup.key import Key
 import s3tup.constants as constants
 import s3tup.utils as utils
 
