@@ -85,9 +85,8 @@ class Bucket(object):
 
         """
         for i in xrange(0, len(keys), 1000):
-            data = '<?xml version="1.0" encoding="UTF-8"?>'
-                   '<Delete>'
-                   '<Quiet>true</Quiet>'
+            data = ('<?xml version="1.0" encoding="UTF-8"?>'
+                    '<Delete><Quiet>true</Quiet>')
             for k in keys[i:i+1000]:
                 log.info('removed: {}'.format(k))
                 data += '<Object><Key>{}</Key></Object>'.format(k)
@@ -110,10 +109,10 @@ class Bucket(object):
         except AttributeError: headers = None
         try:
             if self.region.strip() != '' and self.region is not None:
-                data = """<CreateBucketConfiguration 
-                        xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                        <LocationConstraint>{}</LocationConstraint> 
-                        </CreateBucketConfiguration >""".format(self.region)
+                data = ('<CreateBucketConfiguration '
+                        'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                        '<LocationConstraint>{}</LocationConstraint>'
+                        '</CreateBucketConfiguration>').format(self.region)
             else:
                 data = None
         except AttributeError:
@@ -253,9 +252,9 @@ class Bucket(object):
             data = logging
         else:
             log.info("deleting logging configuration...")
-            data = '<?xml version="1.0" encoding="UTF-8"?>\
-                    <BucketLoggingStatus \
-                    xmlns="http://doc.s3.amazonaws.com/2006-03-01"/>'
+            data = ('<?xml version="1.0" encoding="UTF-8"?>'
+                    '<BucketLoggingStatus '
+                    'xmlns="http://doc.s3.amazonaws.com/2006-03-01"/>')
         return self.make_request('PUT', 'logging', data=data)
 
     def sync_notification(self):
@@ -302,10 +301,10 @@ class Bucket(object):
         else:
             log.info("suspending versioning...")
             status = 'Suspended'
-        data = '<VersioningConfiguration \
-                xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\
-                <Status>{}</Status>\
-                </VersioningConfiguration>'.format(status)
+        data = ('<VersioningConfiguration '
+                'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                '<Status>{}</Status>'
+                '</VersioningConfiguration>').format(status)
         return self.make_request('PUT', 'versioning', data=data)
 
     def sync_website(self):
