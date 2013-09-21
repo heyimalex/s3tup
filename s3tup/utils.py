@@ -67,7 +67,7 @@ def file_md5(f):
         m.update(buf)
     return b64encode(m.digest()).strip()
 
-def os_walk_iter(src):
+def os_walk_relative(src):
     """Return list of all file paths in src relative to src"""
     for path, dirs, files in os.walk(src):
         for f in files:
