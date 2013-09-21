@@ -85,12 +85,12 @@ class Bucket(object):
 
         """
         for i in xrange(0, len(keys), 1000):
-            data = """<?xml version="1.0" encoding="UTF-8"?>
-                      <Delete>
-                      <Quiet>true</Quiet>\n"""
+            data = '<?xml version="1.0" encoding="UTF-8"?>'
+                   '<Delete>'
+                   '<Quiet>true</Quiet>'
             for k in keys[i:i+1000]:
                 log.info('removed: {}'.format(k))
-                data += '<Object><Key>{}</Key></Object>\n'.format(k)
+                data += '<Object><Key>{}</Key></Object>'.format(k)
             data += '</Delete>'
             self.make_request('POST', 'delete', data=data)
 
