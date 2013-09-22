@@ -17,14 +17,13 @@ class Bucket(object):
     sync to s3 using the various sync methods provided.
 
     """
-
     def __init__(self, conn, name, key_factory=None, rsync=None, **kwargs):
         self.conn = conn
         self.name = name
         self.key_factory = key_factory
         self.rsync = rsync or []
-
         self.redirects = kwargs.pop('redirects', [])
+
         for k,v in kwargs.iteritems():
             if k in constants.BUCKET_ATTRS:
                 self.__dict__[k] = v
@@ -40,10 +39,8 @@ class Bucket(object):
             return self.key_factory.make_key(self.conn, key_name, self.name)
 
     def make_request(self, method, params=None, data=None, headers=None):
-        """
-        Convenience method for self.conn.make_request; has the bucket and
-        key fields already filled in.
-        """
+        """Convenience method for self.conn.make_request; has the bucket and
+        key fields already filled in."""
         return self.conn.make_request(method, self.name, None, params,
                                       data=data, headers=headers)
 
@@ -104,20 +101,7 @@ class Bucket(object):
         """
         log.info("syncing bucket '{}'...".format(self.name))
 
-        # Create the bucket
-        try: headers = {'x-amz-acl': self.canned_acl}
-        except AttributeError: headers = None
-        try:
-            if self.region.strip() != '' and self.region is not None:
-                data = ('<CreateBucketConfiguration '
-                        'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n'
-                        '  <LocationConstraint>{}</LocationConstraint>\n'
-                        '</CreateBucketConfiguration>').format(self.region)
-            else:
-                data = None
-        except AttributeError:
-            data = None
-        self.conn.make_request('PUT', self.name, headers=headers, data=data)
+        self.create_bucket()
 
         if rsync_only and 'rsync' not in self.__dict__:
             log.warning("Running in rsync only mode with no rsync config.")
@@ -144,6 +128,22 @@ class Bucket(object):
             self.sync_redirects()
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
+
+    def create_bucket(self):
+        """Create bucket on s3."""
+        try: headers = {'x-amz-acl': self.canned_acl}
+        except AttributeError: headers = None
+        try:
+            if self.region.strip() != '' and self.region is not None:
+                data = ('<CreateBucketConfiguration '
+                        'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n'
+                        '  <LocationConstraint>{}</LocationConstraint>\n'
+                        '</CreateBucketConfiguration>').format(self.region)
+            else:
+                data = None
+        except AttributeError:
+            data = None
+        self.conn.make_request('PUT', self.name, headers=headers, data=data)
 
     def sync_bucket(self):
         """Run all of the bucket sync methods."""
