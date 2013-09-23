@@ -1,3 +1,10 @@
+"""
+s3tup.utils
+~~~~~~~~~~~
+
+This module contains various utility functions and classes.
+"""
+
 from fnmatch import fnmatch
 from base64 import b64encode
 import hashlib
@@ -21,6 +28,11 @@ class Matcher(object):
         self.ignore_patterns = ignore_patterns or set()
         self.regexes = regexes or set()
         self.ignore_regexes = ignore_regexes or set()
+
+        self.patterns = set(self.patterns)
+        self.ignore_patterns = set(self.ignore_patterns)
+        self.regexes = set(self.regexes)
+        self.ignore_regexes = set(self.ignore_regexes)
 
     def matches(self, s):
         """Return whether this matcher matches string s"""
@@ -59,7 +71,7 @@ class Matcher(object):
 
 
 def file_md5(f):
-    """Return base64 encoded md5 hash of filelike object f"""
+    """Return base64 encoded md5 hash of filelike object f."""
     m = hashlib.md5()
     while True:
         buf=f.read(8192)
@@ -68,7 +80,7 @@ def file_md5(f):
     return b64encode(m.digest()).strip()
 
 def os_walk_relative(src):
-    """Return list of all file paths in src relative to src"""
+    """Return list of all file paths in src relative to src."""
     for path, dirs, files in os.walk(src):
         for f in files:
             full_path = os.path.join(path, f)
