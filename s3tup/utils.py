@@ -24,15 +24,10 @@ class Matcher(object):
     """
     def __init__(self, patterns=None, ignore_patterns=None, regexes=None,
                  ignore_regexes=None):
-        self.patterns = patterns or set()
-        self.ignore_patterns = ignore_patterns or set()
-        self.regexes = regexes or set()
-        self.ignore_regexes = ignore_regexes or set()
-
-        self.patterns = set(self.patterns)
-        self.ignore_patterns = set(self.ignore_patterns)
-        self.regexes = set(self.regexes)
-        self.ignore_regexes = set(self.ignore_regexes)
+        self.patterns = set(patterns or set())
+        self.ignore_patterns = set(ignore_patterns or set())
+        self.regexes = set(regexes or set())
+        self.ignore_regexes = set(ignore_regexes or set())
 
     def matches(self, s):
         """Return whether this matcher matches string s"""
