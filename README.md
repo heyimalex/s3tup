@@ -49,7 +49,7 @@ Documentation here is lacking at the moment, but I'm working on it (and the sour
 
 ## Config File
 
-The s3tup configuration file is plain yaml. The base is a list of bucket configurations which are defined below. An example configuration is available [here](https://github.com/HeyImAlex/s3tup/blob/master/example.yml) to help you and I'll try and keep it as up to date as possible. Because s3tup is just a thin wrapper over the s3 REST api, the best way to understand what all of these options actually do is to consult the [online documentation for s3](http://docs.aws.amazon.com/AmazonS3/latest/API/APIRest.html).
+The s3tup configuration file is plain yaml. The base is a list of bucket configurations which are defined below. An example configuration is available [here](https://github.com/HeyImAlex/s3tup/blob/master/examples/complete.yml) to help you and I'll try and keep it as up to date as possible. Because s3tup is just a thin wrapper over the s3 REST api, the best way to understand what all of these options actually do is to consult the [online documentation for s3](http://docs.aws.amazon.com/AmazonS3/latest/API/APIRest.html).
 
 **Note**: Setting an option to `None` and not setting it at all are not the same thing. For many fields `None` will assert that the configuration option is not set at all.
 
