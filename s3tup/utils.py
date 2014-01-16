@@ -1,12 +1,4 @@
-"""
-s3tup.utils
-~~~~~~~~~~~
-
-This module contains various utility functions and classes.
-"""
-
 from fnmatch import fnmatch
-from base64 import b64encode
 import hashlib
 import os
 import re
@@ -14,7 +6,7 @@ import re
 class Matcher(object):
     """Matches strings based on patterns
 
-    Internally the matcher object has a set of unix style patterns to match
+    Internally the matcher object has a set of glob style patterns to match
     and to ignore, and a set of regexes to match and to ignore. Each of
     these are tested against the string 's' in the matches method. Ignore
     has the highest precedence. If both patterns and regexes are empty, the
@@ -53,7 +45,7 @@ class Matcher(object):
         return matched
 
     def __add__(self, other):
-        """Allow combining matchers"""
+        """Allow combining of matchers."""
         patterns = self.patterns | other.patterns
         ignore_patterns = self.ignore_patterns | other.ignore_patterns
         regexes = self.regexes | other.regexes
@@ -64,59 +56,90 @@ class Matcher(object):
     def __iadd__(self, other):
         return self.__add__(other)
 
+def f_decorator(func):
+    """Makes sure decorated function doesn't mess with file position."""
+    def inner(f, *args, **kwargs):
+        initial_pos = f.tell() # Get initial pos
+        f.seek(0) # Rewind to beginning
+        ret = func(f, *args, **kwargs) # Run decorated func
+        f.seek(initial_pos) # Seek back to where it was
+        return ret
+    return inner
 
-def file_md5(f):
-    """Return base64 encoded md5 hash of filelike object f."""
+@f_decorator
+def f_md5(f):
+    """Return md5 hash of file like object."""
     m = hashlib.md5()
     while True:
         buf=f.read(8192)
         if not buf: break
         m.update(buf)
-    return b64encode(m.digest()).strip()
+    return m.digest()
+
+@f_decorator
+def f_sizeof(f):
+    """Return size of file like object."""
+    f.seek(0, 2)
+    return f.tell()
+
+# Note: f *must* be a real file, not just file-like
+# as f_chunk re-opens it using f.name
+def f_chunk(f, chunk_size):
+    """Return file like object split into chunk-sized file like objects"""
+    class FChunk(object):
+        """Mimics file interface for subset of a real file."""
+        def __init__(self, f, start, size):
+            self._f = open(f.name, f.mode)
+            self._f.seek(start, 0)
+            self._start = start
+            self._end = start+size
+            self._size = size
+
+        def read(self, size=0):
+            remaining = self._end - self._f.tell()
+            if size <= 0 or size > remaining:
+                return self._f.read(remaining)
+            else:
+                return self._f.read(size)
+
+        def seek(self, offset, whence=0):
+            if whence == 0:
+                self._f.seek(self._start+offset, 0)
+            elif whence == 1:
+                self._f.seek(offset, 1)
+            elif whence == 2:
+                self._f.seek(self._end+offset, 0)
+            else:
+                raise IOError
+
+        def tell(self):
+            return self._f.tell() - self._start
+
+        @property
+        def closed(self):
+            return self._f.closed
+
+        def close(self):
+            self._f.close()
+
+    full_size = f_sizeof(f)
+    num_chunks = (full_size+chunk_size-1)/chunk_size # Round up div
+
+    chunks = []
+    start = 0
+    for r in xrange(num_chunks):
+        # If last block is smaller than chunk_size
+        if full_size < (start + chunk_size):
+            chunk = FChunk(f, start, full_size-start)
+        else:
+            chunk = FChunk(f, start, chunk_size)
+        chunks.append(chunk)
+        start += chunk_size
+    return chunks
 
 def os_walk_relative(src):
     """Return list of all file paths in src relative to src."""
-    for path, dirs, files in os.walk(src):
+    for root, dirs, files in os.walk(src):
         for f in files:
-            full_path = os.path.join(path, f)
+            full_path = os.path.join(root, f)
             yield os.path.relpath(full_path, src)
-
-def key_diff(before, after):
-    """
-    Return a dict representing the difference between two runs of
-    Bucket.get_remote_keys().
-
-    Useful to see changes in the keys within a bucket after some operation.
-    Ex:
-        before = list(bucket.get_remote_keys())
-        do_something()
-        diff = key_diff(before, bucket.get_remote_keys())
-
-    Returned dict has fields 'new', 'removed', 'modified', and 'unmodified',
-    and each field contains a list of str key names. Size and md5 are used to
-    check for modification.
-
-    Note: Be sure that 'before' is a list and *not* the generator returned
-    by Bucket.get_remote_keys; because it's a generator, it won't actually
-    fetch them from the server until they are iterated through.
-
-    """
-    before_set = {k['name'] for k in before}
-    after_set = {k['name'] for k in after}
-
-    before_keys = {k['name']: k for k in before if k['name'] in after_set}
-    after_keys = {k['name']: k for k in after if k['name'] in before_set}
-
-    removed = list(before_set-after_set)
-    new = list(after_set-before_set)
-
-    modified = []
-    unmodified = []
-    for k in (before_set & after_set):
-        if before_keys[k]['md5'] == after_keys[k]['md5'] and \
-           before_keys[k]['size'] == after_keys[k]['size']:
-            unmodified.append(k)
-        else:
-            modified.append(k)
-    return {'new': new, 'removed': removed, 'modified': modified,
-            'unmodified': unmodified}

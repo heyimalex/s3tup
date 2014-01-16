@@ -1,18 +1,10 @@
-"""
-s3tup.parse
-~~~~~~~~~~~
-
-This module contains all of the parsing methods used to convert YAML
-configuration files into usable s3tup objects.
-"""
-
 import logging
 import copy
 
 from s3tup.connection import Connection
 from s3tup.bucket import Bucket
-from s3tup.key import KeyFactory, KeyConfigurator, Key
-from s3tup.rsync import Rsync
+from s3tup.key import KeyFactory, KeyConfigurator
+from s3tup.rsync import RsyncPlanner, RsyncConfig
 from s3tup.exception import ConfigParseError, ConfigLoadError
 from s3tup.utils import Matcher
 
@@ -21,8 +13,8 @@ log = logging.getLogger('s3tup.parse')
 def load_config(config):
     """Return parseable s3tup configuration from whatever 'config' is.
 
-    Probably the most magic method here, load_config guesses how to convert
-    'config' into a regular s3tup config list based on its type.
+    Likely the most magic method here, load_config guesses how to convert
+    'config' into a standard s3tup config list-of-dicts based on its type.
 
     Currently supports:
 
@@ -34,28 +26,42 @@ def load_config(config):
     """
     if isinstance(config, basestring):
         try:
-            config = file(config)
+            config = open(config, 'r')
         except IOError:
-            raise ConfigLoadError("Config file '{}' does not exist"
-                                  .format(config))
+            msg = "File '{}' does not exist".format(config)
+            raise ConfigLoadError(msg)
 
-    if isinstance(config, file):
+    read = getattr(config, "read", None)
+    if callable(read):
         import yaml
         try:
             config = yaml.load(config)
         except yaml.YAMLError as e:
-            raise ConfigLoadError(e)
+            msg = "Problem parsing yaml:\n"+ e.__str__()
+            raise ConfigLoadError(msg)
 
     if isinstance(config, dict):
         config = [config,]
 
+    unknown_error_msg = (
+        "Unable to properly load config. "
+        "Make sure that supplied param is a list of dicts."
+    )
+    if not isinstance(config, list):
+        raise ConfigLoadError(unknown_error_msg)
+    for c in config:
+        if not isinstance(c, dict):
+            raise ConfigLoadError(unknown_error_msg)
+
     return config
 
 # Recursive config definition
+#
 # [x, ...] = list of 'x's
 # {a, b, c} = dict with keys 'a', 'b', 'c'
 # {a!} = key 'a' is required
 # {*iterable} = unpack iterable into definition
+#
 # config: [bucket, ...]
 # bucket: {bucket!, key_config, rsync, *s3tup.constants.BUCKET_ATTRS}
 # key_config: [key_configurator, ...]
@@ -66,7 +72,7 @@ def load_config(config):
 
 # IMPORTANT:
 # Many parse methods directly mutate input by design. This can lead to many
-# hard to debug issues, especially when using s3tup programtically (rather
+# hard to debug issues, especially when using parsers programtically (rather
 # than through the cli). To counteract this, the parse_method decorator is
 # applied to each parse method. This decorator basically calls copy.deepcopy
 # on the input before passing it on to the decorated function. Performance
@@ -97,35 +103,42 @@ def parse_bucket(config):
     Connection that tries to load credentials from env vars.
 
     """
+    if not isinstance(config, dict):
+        msg = 'Every bucket config must be a dict'
+        raise ConfigParseError(msg)
+
     try:
         bucket_name = config.pop('bucket')
     except KeyError:
-        raise ConfigParseError("Bucket config must contain field 'bucket'")
+        msg = "Every bucket config must contain field 'bucket'"
+        raise ConfigParseError(msg)
+
+    access_key_id = config.pop('access_key_id', None)
+    secret_access_key = config.pop('secret_access_key', None)
+    conn = Connection(access_key_id, secret_access_key)
 
     try:
-        access_key_id = config.pop('access_key_id')
-        secret_access_key = config.pop('secret_access_key')
-    except KeyError:
-        conn = None
-    else:
-        conn = Connection(access_key_id, secret_access_key)
+        if 'key_config' in config:
+            key_factory = parse_key_config(config.pop('key_config'))
+        else:
+            key_factory = None
 
-    if 'key_config' in config:
-        key_factory = parse_key_config(config.pop('key_config'))
-    else:
-        key_factory = None
-
-    if 'rsync' in config:
-        rsync = parse_rsync(config.pop('rsync'))
-    else:
-        rsync = []
+        if 'rsync' in config:
+            rsync_planner = parse_rsync(config.pop('rsync'))
+        else:
+            rsync_planner = None
+    except ConfigParseError as e:
+        msg = "Bucket('{}'): {}".format(bucket_name, e.message)
+        raise ConfigParseError(msg)
 
     # Attempt to create and return a Bucket from the supplied config.
     # Bucket will throw TypeError if it gets unknown kwargs.
     try:
-        return Bucket(conn, bucket_name, key_factory, rsync, **config)
+        return Bucket(conn, bucket_name, key_factory, rsync_planner, **config)
     except TypeError as e:
-        raise ConfigParseError(e)
+        invalid = e.message[e.message.index("'")+1:-1]
+        msg = "Bucket('{}'): Invalid field '{}'".format(bucket_name, invalid)
+        raise ConfigParseError(msg)
 
 @parse_method
 def parse_rsync(config):
@@ -148,7 +161,7 @@ def parse_rsync(config):
           - src: path/to/some/other/folder
             dest: some/prefix/
 
-    Regardless of the input type, this function returns a list.
+    Regardless of the input type, this function returns an RsyncPlanner.
 
     """
     # Convert all acceptable input into a standard list-of-dicts format
@@ -157,26 +170,27 @@ def parse_rsync(config):
     elif isinstance(config, dict):
         config = [config,]
 
-    rsync = []
+    rsync_planner = RsyncPlanner()
     for r in config:
-        rsync.append(parse_rsync_object(r))
-    return rsync
+        rsync_planner.configs.append(parse_rsync_object(r))
+    return rsync_planner
 
 @parse_method
 def parse_rsync_object(config):
     """Return a properly configured Rsync object from 'config'"""
     matcher, config = extract_matcher(config)
     try:
-        return Rsync(matcher=matcher, **config)
+        return RsyncConfig(matcher=matcher, **config)
     except TypeError as e:
-        raise ConfigParseError(e)
+        msg = "Invalid rsync config: "+e.message
+        raise ConfigParseError(msg)
 
 @parse_method
 def parse_key_config(config):
     """Return a properly configured KeyFactory from 'config'"""
     # Unlike with rsync, key_config must be a list
     if not isinstance(config, list):
-        raise ConfigParseError('key_config must be a list')
+        raise ConfigParseError('key_config must be a list.')
 
     configurators = []
     for c in config:
@@ -191,7 +205,8 @@ def parse_key_configurator(config):
     try:
         return KeyConfigurator(matcher=matcher, **config)
     except TypeError as e:
-        raise ConfigParseError(e)
+        msg = "Invalid key config: "+e.message
+        raise ConfigParseError(msg)
 
 @parse_method
 def extract_matcher(config):
@@ -203,6 +218,10 @@ def extract_matcher(config):
     fields are present, the matcher returned will be None.
 
     """
+    if not isinstance(config, dict):
+        msg = "Attempt to extract matcher from non-dict: '{}'".format(config)
+        raise ConfigParseError(msg)
+
     patterns = config.pop('patterns', None)
     ignore_patterns = config.pop('ignore_patterns', None)
     regexes = config.pop('regexes', None)

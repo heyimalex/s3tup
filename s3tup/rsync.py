@@ -1,107 +1,176 @@
+from binascii import hexlify
+import hashlib
 import logging
 import os
 
+from s3tup.exception import ActionConflict
 import s3tup.utils as utils
 
 log = logging.getLogger('s3tup.rsync')
 
-class Rsync(object):
+class ActionPlan(object):
+    """ Stores a set of actions to be executed on keys.
+
+    Buckets know how to execute action plans, and action
+    plans know when there are conflicting actions on keys.
+    """
+
+    def __init__(self):
+        self._actions = {}
+
+    # Ugly... but works and passes tests
+    def _add_action(self, action_type, key, *args):
+        new_val = [action_type,]+list(args)
+        old_val = self._actions.pop(key, None)
+
+        if old_val == None:
+            self._actions[key] = new_val
+        elif old_val[0] == 'delete':
+            if action_type != 'delete':
+                # don't complain if delete is overwritten
+                pass
+            self._actions[key] = new_val
+        else:
+            if action_type == 'delete':
+                self._actions[key] = old_val
+            else:
+                if new_val == old_val:
+                    self._actions[key] = old_val
+                else:
+                    msg = "Conflicting actions set for key '{}':\n".format(key)
+                    for v in (new_val, old_val):
+                        if v[0] in ("delete", "sync"):
+                            msg += '{}, '.format(v[0])
+                        else:
+                            msg += '{} -> {}, '.format(v[0], v[1])
+                    msg = msg[:-2]
+                    raise ActionConflict(msg)
+
+    def delete(self, key):
+        self._add_action('delete', key)
+
+    def sync(self, key):
+        self._add_action('sync', key)
+
+    def redirect(self, key, url):
+        self._add_action('redirect', key, url)
+
+    def upload(self, key, path):
+        self._add_action('upload', key, path)
+
+    @property
+    def affected_keys(self):
+        return self._actions.keys()
+
+    @property
+    def to_upload(self):
+        for k,v in self._actions.iteritems():
+            if v[0] == 'upload':
+                yield k, v[1]
+
+    @property
+    def to_redirect(self):
+        for k,v in self._actions.iteritems():
+            if v[0] == 'redirect':
+                yield k, v[1]
+
+    @property
+    def to_delete(self):
+        for k,v in self._actions.iteritems():
+            if v[0] == 'delete':
+                yield k
+
+    @property
+    def to_sync(self):
+        for k,v in self._actions.iteritems():
+            if v[0] == 'sync':
+                yield k
+
+    def __add__(self, other):
+        new = ActionPlan()
+        for old in (other, self):
+            for key,v in old._actions.iteritems():
+                if v[0] == 'redirect':
+                    new.redirect(key, v[1])
+                if v[0] == 'upload':
+                    new.upload(key, v[1])
+                if v[0] == 'delete':
+                    new.delete(key)
+                if v[0] == 'sync':
+                    new.sync(key)
+        return new
+
+    def __iadd__(self, other):
+        return self.__add__(other)
+
+
+class RsyncPlanner(object):
+    """Container for RsyncConfigs."""
+
+    def __init__(self, rsync_configs=None):
+        self.configs = rsync_configs or []
+
+    def plan(self, remote_keys):
+        plan = ActionPlan()
+        for config in self.configs:
+            plan += config.plan(remote_keys)
+        return plan
+
+class RsyncConfig(object):
+
     def __init__(self, src=None, dest=None, delete=False, matcher=None):
         self.src = src
         self.dest = dest
         self.delete = delete
-        self.matcher = matcher
+        self.matcher = matcher or utils.Matcher()
 
-    def run(self, bucket, protect=None):
-        # Silence key logging to avoid redundant messages
-        key_log = logging.getLogger('s3tup.key')
-        key_log.setLevel(logging.WARNING)
+    def plan(self, remote_keys):
+        remote_key_names = set(remote_keys.keys())
+        new = set()
+        modified = set()
+        unmodified = set()
+        for k in self._get_local_key_names():
+            if k not in remote_key_names:
+                new.add(k)
+            else:
+                local_md5 = self._get_local_md5(k)
+                remote_key = remote_keys[k]
+                if (remote_key.md5 == local_md5):
+                    unmodified.add(k)
+                else:
+                    modified.add(k)
+        removed = remote_key_names - (modified | unmodified)
 
-        src = self.src or ''
-        dest = self.dest or ''
-
-        bucket_url = bucket.name+'.s3.amazonaws.com'
-        log.info("rsyncing '{}'".format(os.path.join(bucket_url, dest)))
-        log.info("    with '{}'...".format(os.path.abspath(src)))
-
-        local_keys = self._get_local_keys()
-        remote_keys = list(bucket.get_remote_keys(prefix=self.dest))
-
-        # Is it smart to depend on key_diff for this?
-        keys = utils.key_diff(remote_keys, local_keys)
-        new_keys = keys['new']
-        removed_keys = keys['removed']
-        modified_keys = keys['modified']
-        unmodified_keys = keys['unmodified']
-
-        # Delete removed keys if delete is True
+        plan = ActionPlan()
+        for k in new | modified:
+            plan.upload(k, self._get_local_path_from_key(k))
+        for k in unmodified:
+            plan.sync(k)
         if self.delete:
-            bucket.delete_remote_keys(removed_keys)
-        else:
-            unmodified_keys.extend(removed_keys)
-            removed_keys = []
+            for k in removed:
+                plan.delete(k)
+        return plan
 
-        # Upload new keys
-        for k in new_keys:
-            key = bucket.make_key(k)
-            log.info("new: '{}', uploading now...".format(k))
-            self.rsync_key(key)
+    def _get_local_md5(self, key):
+        local_path = self._get_local_path_from_key(key)
+        with open(local_path, 'rb') as f:
+            if utils.f_sizeof(f) <= 5242880:
+                return hexlify(utils.f_md5(f))
+            chunks = utils.f_chunk(f, 5242880)
+            m = hashlib.md5()
+            for chunk in chunks:
+                m.update(utils.f_md5(chunk))
+            return "{}-{}".format(hexlify(m.digest()), len(chunks))
 
-        # Upload modified keys
-        for k in modified_keys:
-            key = bucket.make_key(k)
-            log.info("modified: '{}', uploading now...".format(k))
-            self.rsync_key(key)
-
-        # Unsilence key logging
-        key_log.setLevel(logging.DEBUG)
-
-        log.info('rsync complete!')
-        log.info('{} new, {} removed, {} modified, {} unmodified'.format(
-                 len(new_keys), len(removed_keys), len(modified_keys),
-                 len(unmodified_keys)))
-
-        return {'new': new_keys, 
-                'removed': removed_keys, 
-                'modified': modified_keys, 
-                'unmodified': unmodified_keys}
-
-    def _get_local_keys(self):
-        """Return bucket.get_remote_keys-like response from files in self.src
-
-        Uses utils.os_walk_relative to get all filenames relative to
-        self.src, and then returns a list of dicts similar to
-        Bucket.get_remote_keys. This value is used as an input to key_diff.
-
-        """
+    def _get_local_key_names(self):
         src = self.src or '.'
-        dest = self.dest or ''
-        matcher = self.matcher or utils.Matcher()
-        keys = []
-        for relpath in utils.os_walk_relative(src):
-            if not matcher.matches(relpath):
+        dest = self.dest or '.'
+        for path in utils.os_walk_relative(src):
+            if not self.matcher.matches(path):
                 continue
+            yield os.path.normpath(os.path.join(dest, path))
 
-            key_name = os.path.join(dest, relpath)
-            local_path = os.path.join(src, relpath)
-
-            key = {}
-            key['name'] = key_name
-            key['md5'] = utils.file_md5(open(local_path, 'rb'))
-            key['size'] = os.path.getsize(local_path)
-            keys.append(key)
-        return keys
-
-    def rsync_key(self, key):
-        """Rsyncs s3tup.key.Key 'key' with its corresponding local file.
-
-        Takes a s3tup.key.Key object and rsyncs it with its corresponding
-        local file. The local file path is basically just the key name minus
-        self.dest relative to self.src.
-
-        """
-        src = self.src or ''
-        dest = self.dest or ''
-        unrelative = os.path.relpath(key.name, dest)
-        local_path = os.path.join(src, unrelative)
-        key.rsync(open(local_path, 'rb'))
+    def _get_local_path_from_key(self, key):
+        src = self.src or '.'
+        dest = self.dest or '.'
+        return os.path.normpath(os.path.join(src, os.path.relpath(key, dest)))

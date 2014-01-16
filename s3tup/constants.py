@@ -30,7 +30,6 @@ BUCKET_ATTRS = (
     'notification',
     'policy',
     'region',
-    'rsync',
     'tagging',
     'versioning',
     'website',
