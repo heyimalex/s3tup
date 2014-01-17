@@ -1,5 +1,6 @@
 import argparse
 import logging
+import textwrap
 import sys
 import os
 
@@ -56,7 +57,10 @@ def main():
     args = parser.parse_args()
 
     if not (args.quiet or args.verbose):
-        logging.basicConfig(format='%(message)s', level=logging.INFO)
+        handler = logging.StreamHandler()
+        handler.setFormatter(WrappedFormatter('%(message)s'))
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
     elif args.verbose:
         logging.basicConfig(format='%(levelname)s: %(message)s',
                             level=logging.DEBUG)
@@ -87,3 +91,10 @@ def run(config, dryrun=False, rsync_only=False, concurrency=None,
         if concurrency is not None:
             b.conn.concurrency = concurrency
         b.sync(dryrun=dryrun, rsync_only=rsync_only)
+
+class WrappedFormatter(logging.Formatter):
+    """Wraps log lines at 78 chars."""
+    def format(self, record):
+        formatted = super(WrappedFormatter, self).format(record)
+        split = formatted.split('\n')
+        return '\n'.join([textwrap.fill(l, 78) for l in split])
