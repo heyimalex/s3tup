@@ -117,7 +117,7 @@ class Bucket(object):
 
     # SYNC METHODS
 
-    def sync(self, dryrun=False, rsync_only=False):
+    def sync(self, dryrun=False, rsync=False):
         """Sync everything.
 
         Takes every applicable attribute set on this Bucket object and
@@ -129,8 +129,8 @@ class Bucket(object):
         log.info("syncing bucket '{}'...".format(self.name))
 
         self.create()
-        self.sync_bucket()
-        self.sync_keys()
+        self.sync_bucket(dryrun=dryrun)
+        self.sync_keys(dryrun=dryrun, rsync=rsync)
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
 
@@ -148,7 +148,10 @@ class Bucket(object):
             data = None
         self.make_request('PUT', headers=headers, data=data)
 
-    def sync_bucket(self):
+    def sync_bucket(self, dryrun=False):
+        if dryrun:
+            tmp = self.make_request
+            self.make_request = lambda *args, **kwargs:None
         self.conn.join([
             self.sync_acl,
             self.sync_cors,
@@ -160,12 +163,24 @@ class Bucket(object):
             self.sync_versioning,
             self.sync_website,
         ])
+        if dryrun:
+            self.make_request = tmp
 
-    def sync_keys(self):
-        plan = self._make_action_plan()
-        self._execute_action_plan(plan)
+    def sync_keys(self, dryrun=False, rsync=False):
+        plan = self._make_action_plan(rsync)
+        if not dryrun:
+            self._execute_action_plan(plan)
+        else:
+            for k, path in plan.to_upload:
+                print "upload: {} -> {}".format(path, k)
+            for k in plan.to_sync:
+                print "sync: "+k
+            for k, url in plan.to_redirect:
+                print "redirect: {} -> {}".format(k, url)
+            for k in plan.to_delete:
+                print "delete: "+k
 
-    def _make_action_plan(self):
+    def _make_action_plan(self, rsync=False):
         remote_keys = self.get_remote_keys()
 
         if self.rsync_planner:
@@ -182,6 +197,9 @@ class Bucket(object):
         old_keys = set(remote_keys.keys())
         for k in (old_keys-affected_keys):
             plan.sync(k)
+
+        if rsync:
+            plan.remove_actions('sync', 'redirect')
 
         return plan
 

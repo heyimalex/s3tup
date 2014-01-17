@@ -46,6 +46,14 @@ class ActionPlan(object):
                     msg = msg[:-2]
                     raise ActionConflict(msg)
 
+    def remove_actions(self, *action_types):
+        toremove = []
+        for key,v in self._actions.iteritems():
+            if v[0] in action_types:
+                toremove.append(key)
+        for k in toremove:
+            self._actions.pop(k) #
+
     def delete(self, key):
         self._add_action('delete', key)
 

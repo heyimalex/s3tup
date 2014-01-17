@@ -28,7 +28,7 @@ parser.add_argument(
     action='store_true',
     help='run s3tup without actually... running s3tup')
 parser.add_argument(
-    '--rsync_only',
+    '--rsync',
     action='store_true',
     help='only upload/delete keys that have been modified/removed, don\'t'
          ' sync|redirect keys and don\'t sync bucket attributes')
@@ -66,7 +66,7 @@ def main():
                             level=logging.DEBUG)
 
     try:
-        run(args.config, args.dryrun, args.rsync_only, args.c,
+        run(args.config, args.dryrun, args.rsync, args.c,
             args.access_key_id, args.secret_access_key)
     except Exception as e:
         if args.verbose:
@@ -74,7 +74,7 @@ def main():
         log.error('{}: {}'.format(sys.exc_info()[0].__name__, e))
         sys.exit(1)
 
-def run(config, dryrun=False, rsync_only=False, concurrency=None,
+def run(config, dryrun=False, rsync=False, concurrency=None,
         access_key_id=None, secret_access_key=None,):
 
     if access_key_id is not None:
@@ -90,7 +90,7 @@ def run(config, dryrun=False, rsync_only=False, concurrency=None,
     for b in buckets:
         if concurrency is not None:
             b.conn.concurrency = concurrency
-        b.sync(dryrun=dryrun, rsync_only=rsync_only)
+        b.sync(dryrun=dryrun, rsync=rsync)
 
 class WrappedFormatter(logging.Formatter):
     """Wraps log lines at 78 chars."""
