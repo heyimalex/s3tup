@@ -12,6 +12,12 @@ from gevent.pool import Pool
 from gevent import monkey
 monkey.patch_all(thread=False, select=False)
 
+# Make greenlets not print traceback info on exception.
+# I imagine this isn't a good thing to do, but pushing a
+# traceback to stdout on a cli is a no go.
+from gevent.hub import Hub
+Hub.print_exception = lambda *args, **kwargs:None
+
 from bs4 import BeautifulSoup
 from requests import Session, Request
 from requests.structures import CaseInsensitiveDict
@@ -200,7 +206,7 @@ class Connection(object):
             log_message += '  request: {} {}\n'.format(method, url)
             for c in error.children:
                 log_message +='  {}: {}\n'.format(c.name, c.text)
-            log.error(log_message)
+            log.debug(log_message)
 
             code = error.find('code').text
             message = error.find('message').text
