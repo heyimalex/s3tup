@@ -6,11 +6,13 @@ import logging
 import hashlib
 import hmac
 import urllib
+import signal
 
 import gevent
 from gevent.pool import Pool
 from gevent import monkey
 monkey.patch_all(thread=False, select=False)
+gevent.signal(signal.SIGQUIT, gevent.shutdown)
 
 from bs4 import BeautifulSoup
 from requests import Session, Request
@@ -92,7 +94,7 @@ class Connection(object):
                     greenlet = gevent.spawn(f)
                 self.pool.add(greenlet)
                 greenlets.append(greenlet)
-            return gevent.joinall(greenlets)
+            return gevent.joinall(greenlets, raise_error=True)
 
     # Here be dragons
     def make_request(self, method, bucket, key=None, params=None, data=None,
