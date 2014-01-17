@@ -52,8 +52,9 @@ class Connection(object):
 
     @concurrency.setter
     def concurrency(self, val):
-        self.pool.wait()
-        self.pool = Pool(val)
+        self.pool.join()
+        if val > 0:
+            self.pool = Pool(val)
         self._concurrency = val
 
     # Join requires some strange context management because it's

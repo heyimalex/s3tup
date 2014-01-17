@@ -84,6 +84,6 @@ def run(config, dryrun=False, rsync_only=False, concurrency=None,
     log.info(title)
 
     for b in buckets:
-        if concurrency:
+        if concurrency is not None:
             b.conn.concurrency = concurrency
         b.sync(dryrun=dryrun, rsync_only=rsync_only)
