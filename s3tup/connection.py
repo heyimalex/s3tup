@@ -25,7 +25,7 @@ log = logging.getLogger('s3tup.connection')
 class Connection(object):
 
     def __init__(self, access_key_id=None, secret_access_key=None,
-                 concurrency=10):
+                 concurrency=5):
         if access_key_id is None:
             try:
                 access_key_id = os.environ['AWS_ACCESS_KEY_ID']
@@ -40,8 +40,7 @@ class Connection(object):
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
 
-        self.pool = Pool(concurrency)
-        self._concurrency = concurrency
+        self.concurrency = concurrency
         self._joined = False
 
         self.stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
@@ -52,9 +51,12 @@ class Connection(object):
 
     @concurrency.setter
     def concurrency(self, val):
-        self.pool.join()
+        try:
+            self._pool.join()
+        except AttributeError:
+            pass
         if val > 0:
-            self.pool = Pool(val)
+            self._pool = Pool(val)
         self._concurrency = val
 
     # Join requires some strange context management because it's
@@ -68,9 +70,9 @@ class Connection(object):
         old = self._joined
         self._joined = True
         if old:
-            self.pool._semaphore.counter += 1
+            self._pool._semaphore.counter += 1
             yield
-            self.pool._semaphore.counter -= 1
+            self._pool._semaphore.counter -= 1
         else:
             yield
         self._joined = old
@@ -92,7 +94,7 @@ class Connection(object):
                     greenlet = gevent.spawn(*f)
                 else:
                     greenlet = gevent.spawn(f)
-                self.pool.add(greenlet)
+                self._pool.add(greenlet)
                 greenlets.append(greenlet)
             gevent.joinall(greenlets, raise_error=True)
             return [g.get() for g in greenlets]
