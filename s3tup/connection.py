@@ -6,13 +6,11 @@ import logging
 import hashlib
 import hmac
 import urllib
-import signal
 
 import gevent
 from gevent.pool import Pool
 from gevent import monkey
 monkey.patch_all(thread=False, select=False)
-gevent.signal(signal.SIGQUIT, gevent.shutdown)
 
 from bs4 import BeautifulSoup
 from requests import Session, Request
@@ -78,12 +76,13 @@ class Connection(object):
 
     def join(self, functions):
         if self.concurrency <= 0: # Useful for debugging
+            out = []
             for f in functions:
                 if hasattr(f, '__iter__'):
-                    f[0](*f[1:])
+                    out.append(f[0](*f[1:]))
                 else:
-                    f()
-            return
+                    out.append(f())
+            return out
 
         with self.joincontext():
             greenlets = []
@@ -94,7 +93,8 @@ class Connection(object):
                     greenlet = gevent.spawn(f)
                 self.pool.add(greenlet)
                 greenlets.append(greenlet)
-            return gevent.joinall(greenlets, raise_error=True)
+            gevent.joinall(greenlets, raise_error=True)
+            return [g.get() for g in greenlets]
 
     # Here be dragons
     def make_request(self, method, bucket, key=None, params=None, data=None,
