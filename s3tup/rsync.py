@@ -133,9 +133,7 @@ class RsyncConfig(object):
             if k not in remote_key_names:
                 new.add(k)
             else:
-                local_md5 = self._get_local_md5(k)
-                remote_key = remote_keys[k]
-                if (remote_key.md5 == local_md5):
+                if (self._md5_cmp(remote_keys[k].md5, k)):
                     unmodified.add(k)
                 else:
                     modified.add(k)
@@ -151,16 +149,18 @@ class RsyncConfig(object):
                 plan.delete(k)
         return plan
 
-    def _get_local_md5(self, key):
+    def _md5_cmp(self, s3_md5, key):
         local_path = self._get_local_path_from_key(key)
         with open(local_path, 'rb') as f:
-            if utils.f_sizeof(f) <= 5242880:
-                return hexlify(utils.f_md5(f))
-            chunks = utils.f_chunk(f, 5242880)
-            m = hashlib.md5()
-            for chunk in chunks:
-                m.update(utils.f_md5(chunk))
-            return "{}-{}".format(hexlify(m.digest()), len(chunks))
+            if not '-' in s3_md5:
+                local_md5 = hexlify(utils.f_md5(f))
+            else:
+                chunks = utils.f_chunk(f, 5242880)
+                m = hashlib.md5()
+                for chunk in chunks:
+                    m.update(utils.f_md5(chunk))
+                local_md5 = "{}-{}".format(hexlify(m.digest()), len(chunks))
+            return local_md5 == s3_md5        
 
     def _get_local_key_names(self):
         src = self.src or '.'
