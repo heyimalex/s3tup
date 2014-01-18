@@ -89,7 +89,7 @@ def f_chunk(f, chunk_size):
     class FChunk(object):
         """Mimics file interface for subset of a real file."""
         def __init__(self, f, start, size):
-            self._f = open(f.name, f.mode)
+            self._f = open(f.name, 'rb')
             self._f.seek(start, 0)
             self._start = start
             self._end = start+size
