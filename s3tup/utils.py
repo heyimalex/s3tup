@@ -127,7 +127,7 @@ def f_chunk(f, chunk_size):
 
     chunks = []
     start = 0
-    for r in xrange(num_chunks):
+    for r in range(num_chunks):
         # If last block is smaller than chunk_size
         if full_size < (start + chunk_size):
             chunk = FChunk(f, start, full_size-start)

@@ -28,7 +28,7 @@ class Bucket(object):
 
         # Add all kwargs passed in that are named in 
         # constants.BUCKET_ATTRS to this object instance
-        for k,v in kwargs.iteritems():
+        for k,v in kwargs.items():
             if k in constants.BUCKET_ATTRS:
                 self.__dict__[k] = v
             else:
@@ -75,7 +75,7 @@ class Bucket(object):
         handles paging as well.
 
         """
-        for i in xrange(0, len(key_names), 1000):
+        for i in range(0, len(key_names), 1000):
             data = ('<?xml version="1.0" encoding="UTF-8"?>\n'
                     '<Delete>\n  <Quiet>true</Quiet>\n')
             for k in key_names[i:i+1000]:
@@ -129,7 +129,8 @@ class Bucket(object):
         log.info("syncing bucket '{}'...".format(self.name))
 
         self.create()
-        self.sync_bucket(dryrun=dryrun)
+        if not rsync:
+            self.sync_bucket(dryrun=dryrun)
         self.sync_keys(dryrun=dryrun, rsync=rsync)
 
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
@@ -172,13 +173,13 @@ class Bucket(object):
             self._execute_action_plan(plan)
         else:
             for k, path in plan.to_upload:
-                print "upload: {} -> {}".format(path, k)
+                log.info("upload: {} <- {}".format(k, path))
             for k in plan.to_sync:
-                print "sync: "+k
+                log.info("sync: {}".format(k))
             for k, url in plan.to_redirect:
-                print "redirect: {} -> {}".format(k, url)
+                log.info("redirect: {} -> {}".format(k, url))
             for k in plan.to_delete:
-                print "delete: "+k
+                log.info("delete: {}".format(k))
 
     def _make_action_plan(self, rsync=False):
         remote_keys = self.get_remote_keys()

@@ -48,7 +48,7 @@ class ActionPlan(object):
 
     def remove_actions(self, *action_types):
         toremove = []
-        for key,v in self._actions.iteritems():
+        for key,v in self._actions.items():
             if v[0] in action_types:
                 toremove.append(key)
         for k in toremove:
@@ -72,32 +72,32 @@ class ActionPlan(object):
 
     @property
     def to_upload(self):
-        for k,v in self._actions.iteritems():
+        for k,v in self._actions.items():
             if v[0] == 'upload':
                 yield k, v[1]
 
     @property
     def to_redirect(self):
-        for k,v in self._actions.iteritems():
+        for k,v in self._actions.items():
             if v[0] == 'redirect':
                 yield k, v[1]
 
     @property
     def to_delete(self):
-        for k,v in self._actions.iteritems():
+        for k,v in self._actions.items():
             if v[0] == 'delete':
                 yield k
 
     @property
     def to_sync(self):
-        for k,v in self._actions.iteritems():
+        for k,v in self._actions.items():
             if v[0] == 'sync':
                 yield k
 
     def __add__(self, other):
         new = ActionPlan()
         for old in (other, self):
-            for key,v in old._actions.iteritems():
+            for key,v in old._actions.items():
                 if v[0] == 'redirect':
                     new.redirect(key, v[1])
                 if v[0] == 'upload':

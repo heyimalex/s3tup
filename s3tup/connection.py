@@ -110,7 +110,7 @@ class Connection(object):
                      headers=None):
         # Remove params that are set to None
         if isinstance(params, dict):
-            for k,v in params.copy().iteritems():
+            for k,v in params.copy().items():
                 if v is None:
                     params.pop(k)
 
@@ -149,7 +149,7 @@ class Connection(object):
 
         # Construct canonicalized amz headers string
         canonicalized_amz_headers = ''
-        amz_keys = [k for k in headers.iterkeys() if k.startswith('x-amz-')]
+        amz_keys = [k for k in list(headers.keys()) if k.startswith('x-amz-')]
         for k in sorted(amz_keys):
             v = headers[k].strip()
             canonicalized_amz_headers += '{}:{}\n'.format(k.lower(), v)
@@ -186,7 +186,7 @@ class Connection(object):
         # locking to make lines appear together.
         log_message = '{} {}\n'.format(method, url)
         log_message += 'headers:'
-        for k in sorted(req.headers.iterkeys()):
+        for k in sorted(req.headers.keys()):
             log_message += '\n {}: {}'.format(k, req.headers[k])
         log.debug(log_message)
 
@@ -205,7 +205,9 @@ class Connection(object):
             log_message = "S3 replied with non 2xx response code!!!!\n"
             log_message += '  request: {} {}\n'.format(method, url)
             for c in error.children:
-                log_message +='  {}: {}\n'.format(c.name, c.text)
+                error_name = c.name
+                error_message = c.text.encode('unicode_escape')
+                log_message +='  {}: {}\n'.format(error_name, error_message)
             log.debug(log_message)
 
             code = error.find('code').text

@@ -37,7 +37,7 @@ class KeyFactory(object):
 class KeyConfigurator(object):
     def __init__(self, matcher=None, **kwargs):
         self.matcher = matcher or utils.Matcher()
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
             else:
@@ -94,7 +94,7 @@ class Key(object):
 
         # Add all kwargs passed in that are named in 
         # constants.KEY_ATTRS to this object instance
-        for k,v in kwargs.iteritems():
+        for k,v in kwargs.items():
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
             else:
@@ -141,7 +141,7 @@ class Key(object):
         if self.encrypted:
             headers['x-amz-server-side-encryption'] = 'AES256'
 
-        for k, v in self.metadata.iteritems():
+        for k, v in self.metadata.items():
             headers['x-amz-meta-' + k] = v
 
         for k in constants.KEY_HEADERS:
@@ -200,7 +200,7 @@ class Key(object):
         upload_reqs = []
         parts = []
         chunks = utils.f_chunk(f, MULTIPART_PART_SIZE)
-        for r in xrange(len(chunks)):
+        for r in range(len(chunks)):
             upload_reqs.append([
                 self._multipart_upload_part,
                 chunks[r],

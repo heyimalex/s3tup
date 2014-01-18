@@ -101,13 +101,7 @@ def parse_config(config):
 
 @parse_method
 def parse_bucket(config):
-    """Return a properly configured Bucket from 'config'.
-
-    Note: If access_key_id and secret_access_key are not in the config
-    dict, the returned bucket will have a conn of None, *not* a default
-    Connection that tries to load credentials from env vars.
-
-    """
+    """Return a properly configured Bucket from 'config'."""
     if not isinstance(config, dict):
         msg = 'Every bucket config must be a dict'
         raise ConfigParseError(msg)
