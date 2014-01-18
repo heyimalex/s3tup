@@ -20,7 +20,7 @@ setup(
         'argparse',
         'pyyaml',
         'beautifulsoup4',
-        'gevent',
+        'gevent>=1.0',
     ],
     entry_points = {
       'console_scripts': ['s3tup=s3tup.cli:main'],
