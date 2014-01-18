@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import logging
 import copy
 
@@ -43,16 +44,6 @@ def load_config(config):
     if isinstance(config, dict):
         config = [config,]
 
-    unknown_error_msg = (
-        "Unable to properly load config. "
-        "Make sure that supplied param is a list of dicts."
-    )
-    if not isinstance(config, list):
-        raise ConfigLoadError(unknown_error_msg)
-    for c in config:
-        if not isinstance(c, dict):
-            raise ConfigLoadError(unknown_error_msg)
-
     return config
 
 # Recursive config definition
@@ -82,6 +73,20 @@ def parse_method(f):
     def inner(config):
         return f(copy.deepcopy(config))
     return inner
+
+@contextmanager
+def exception_ctx(context):
+    """Append 'context' to all exceptions raised in context"""
+    try: yield
+    except Exception as e:
+        msg = "{}: {}".format(context, e.message)
+        raise ConfigParseError(msg)
+
+def convert_type_error(e):
+    """Return TypeError converted to more readable ConfigParseError"""
+    bad_kwarg = e.message[e.message.index("'")+1:-1]
+    msg = "Invalid field '{}'".format(bad_kwarg)
+    return ConfigParseError(msg)
 
 @parse_method
 def parse_config(config):
@@ -117,7 +122,7 @@ def parse_bucket(config):
     secret_access_key = config.pop('secret_access_key', None)
     conn = Connection(access_key_id, secret_access_key)
 
-    try:
+    with exception_ctx(bucket_name):
         if 'key_config' in config:
             key_factory = parse_key_config(config.pop('key_config'))
         else:
@@ -127,18 +132,15 @@ def parse_bucket(config):
             rsync_planner = parse_rsync(config.pop('rsync'))
         else:
             rsync_planner = None
-    except ConfigParseError as e:
-        msg = "Bucket('{}'): {}".format(bucket_name, e.message)
-        raise ConfigParseError(msg)
 
-    # Attempt to create and return a Bucket from the supplied config.
-    # Bucket will throw TypeError if it gets unknown kwargs.
-    try:
-        return Bucket(conn, bucket_name, key_factory, rsync_planner, **config)
-    except TypeError as e:
-        invalid = e.message[e.message.index("'")+1:-1]
-        msg = "Bucket('{}'): Invalid field '{}'".format(bucket_name, invalid)
-        raise ConfigParseError(msg)
+        # Attempt to create and return a Bucket from the supplied config.
+        # Bucket will throw TypeError if it gets unknown kwargs.
+        try:
+            return Bucket(conn, bucket_name, key_factory, rsync_planner, **config)
+        except TypeError as e:
+            invalid = e.message[e.message.index("'")+1:-1]
+            msg = "Invalid field '{}'".format(invalid)
+            raise ConfigParseError(msg)
 
 @parse_method
 def parse_rsync(config):
@@ -171,8 +173,9 @@ def parse_rsync(config):
         config = [config,]
 
     rsync_planner = RsyncPlanner()
-    for r in config:
-        rsync_planner.configs.append(parse_rsync_object(r))
+    with exception_ctx('rsync'):
+        for r in config:
+            rsync_planner.configs.append(parse_rsync_object(r))
     return rsync_planner
 
 @parse_method
@@ -182,20 +185,19 @@ def parse_rsync_object(config):
     try:
         return RsyncConfig(matcher=matcher, **config)
     except TypeError as e:
-        msg = "Invalid rsync config: "+e.message
-        raise ConfigParseError(msg)
+        raise convert_type_error(e)
 
 @parse_method
 def parse_key_config(config):
     """Return a properly configured KeyFactory from 'config'"""
-    # Unlike with rsync, key_config must be a list
+    # key_config must be a list
     if not isinstance(config, list):
-        raise ConfigParseError('key_config must be a list.')
+        raise ConfigParseError('key_config must be a list')
 
     configurators = []
-    for c in config:
-        matcher, config = extract_matcher(c)
-        configurators.append(parse_key_configurator(c))
+    with exception_ctx('key_config'):
+        for c in config:
+            configurators.append(parse_key_configurator(c))
     return KeyFactory(configurators)
 
 @parse_method
@@ -205,8 +207,7 @@ def parse_key_configurator(config):
     try:
         return KeyConfigurator(matcher=matcher, **config)
     except TypeError as e:
-        msg = "Invalid key config: "+e.message
-        raise ConfigParseError(msg)
+        raise convert_type_error(e)
 
 @parse_method
 def extract_matcher(config):
