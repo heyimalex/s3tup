@@ -3,8 +3,10 @@ import hashlib
 import os
 import re
 
+
 class Matcher(object):
-    """Matches strings based on patterns
+
+    """Matches strings based on patterns.
 
     Internally the matcher object has a set of glob style patterns to match
     and to ignore, and a set of regexes to match and to ignore. Each of
@@ -14,6 +16,7 @@ class Matcher(object):
     overpower this assumption).
 
     """
+
     def __init__(self, patterns=None, ignore_patterns=None, regexes=None,
                  ignore_regexes=None):
         self.patterns = set(patterns or set())
@@ -22,30 +25,37 @@ class Matcher(object):
         self.ignore_regexes = set(ignore_regexes or set())
 
     def matches(self, s):
-        """Return whether this matcher matches string s"""
+
+        """Return whether this matcher matches string s."""
+
         # If neither patterns nor regexes is set, match everything
         matched = not self.patterns and not self.regexes
-        for pattern in self.patterns:
-            if fnmatch(s, pattern):
-                matched = True
-                break
+
+        if not matched:
+            for pattern in self.patterns:
+                if fnmatch(s, pattern):
+                    matched = True
+                    break
+
         if not matched:
             for regex in self.regexes:
                 if re.search(regex, s):
                     matched = True
                     break
+
         if matched:
             for pattern in self.ignore_patterns:
                 if fnmatch(s, pattern):
                     return False
+
         if matched:
             for regex in self.ignore_regexes:
                 if re.search(regex, s):
                     return False
+
         return matched
 
     def __add__(self, other):
-        """Allow combining of matchers."""
         patterns = self.patterns | other.patterns
         ignore_patterns = self.ignore_patterns | other.ignore_patterns
         regexes = self.regexes | other.regexes
@@ -56,25 +66,37 @@ class Matcher(object):
     def __iadd__(self, other):
         return self.__add__(other)
 
+
+def os_walk_relative(src):
+    """Return list of all file paths in src relative to src."""
+    for root, dirs, files in os.walk(src):
+        for f in files:
+            full_path = os.path.join(root, f)
+            yield os.path.relpath(full_path, src)
+
+
 def f_decorator(func):
-    """Makes sure decorated function doesn't mess with file position."""
+    """Make sure decorated function doesn't alter file position."""
     def inner(f, *args, **kwargs):
-        initial_pos = f.tell() # Get initial pos
-        f.seek(0) # Rewind to beginning
-        ret = func(f, *args, **kwargs) # Run decorated func
-        f.seek(initial_pos) # Seek back to where it was
+        initial_pos = f.tell()          # Get initial pos
+        f.seek(0)                       # Seek to beginning
+        ret = func(f, *args, **kwargs)  # Run decorated function
+        f.seek(initial_pos)             # Seek back to where it was
         return ret
     return inner
+
 
 @f_decorator
 def f_md5(f):
     """Return md5 hash of file like object."""
     m = hashlib.md5()
     while True:
-        buf=f.read(8192)
-        if not buf: break
+        buf = f.read(8192)
+        if not buf:
+            break
         m.update(buf)
     return m.digest()
+
 
 @f_decorator
 def f_sizeof(f):
@@ -82,12 +104,17 @@ def f_sizeof(f):
     f.seek(0, 2)
     return f.tell()
 
+
 # Note: f *must* be a real file, not just file-like
-# as f_chunk re-opens it using f.name
+# as internal class FChunk re-opens it using f.name
 def f_chunk(f, chunk_size):
-    """Return file like object split into chunk-sized file like objects"""
+
+    """Return file split into chunk-sized file like objects."""
+
     class FChunk(object):
-        """Mimics file interface for subset of a real file."""
+
+        """Mimic a file interface for a subsection of a real file."""
+
         def __init__(self, f, start, size):
             self._f = open(f.name, 'rb')
             self._f.seek(start, 0)
@@ -123,7 +150,7 @@ def f_chunk(f, chunk_size):
             self._f.close()
 
     full_size = f_sizeof(f)
-    num_chunks = (full_size+chunk_size-1)/chunk_size # Round up div
+    num_chunks = (full_size+chunk_size-1)/chunk_size  # Round up div
 
     chunks = []
     start = 0
@@ -136,10 +163,3 @@ def f_chunk(f, chunk_size):
         chunks.append(chunk)
         start += chunk_size
     return chunks
-
-def os_walk_relative(src):
-    """Return list of all file paths in src relative to src."""
-    for root, dirs, files in os.walk(src):
-        for f in files:
-            full_path = os.path.join(root, f)
-            yield os.path.relpath(full_path, src)
