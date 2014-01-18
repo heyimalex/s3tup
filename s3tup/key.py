@@ -4,6 +4,7 @@ import mimetypes
 
 from bs4 import BeautifulSoup
 
+from s3tup.exception import S3ResponseError
 import s3tup.utils as utils
 import s3tup.constants as constants
 
@@ -232,7 +233,12 @@ class Key(object):
         self.make_request('POST', {'uploadId': upload_id}, data=data)
 
     def _abort_multipart_upload(self, upload_id):
-        self.make_request('DELETE', {'uploadId': upload_id})
+        try:
+            self.make_request('DELETE', {'uploadId': upload_id})
+        except S3ResponseError as e:
+            if e.error_code == 'NoSuchUpload':
+                return
+            raise
 
     def _multipart_upload_part(self, f, part_num, upload_id):
         log.info("upload: {} (part {})".format(self.pretty_path, part_num))
