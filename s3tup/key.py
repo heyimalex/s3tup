@@ -185,7 +185,7 @@ class Key(object):
 
         if utils.f_sizeof(f) <= MULTIPART_CUTOFF:
             self._basic_upload(f)
-        else:
+        else:requests stats
             self._multipart_upload(f)
         self.sync_acl()
 
@@ -211,7 +211,7 @@ class Key(object):
         try:
             self.conn.join(upload_reqs)
         except:
-            self._abort_multipart_upload()
+            self._abort_multipart_upload(upload_id)
             raise
         
         self._complete_multipart_upload(upload_id, parts)        
