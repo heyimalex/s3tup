@@ -9,9 +9,6 @@ import s3tup.constants as constants
 
 log = logging.getLogger('s3tup.key')
 
-MULTIPART_CUTOFF = 5242880
-MULTIPART_PART_SIZE = 5242880 # Minimum: 5242880
-
 class KeyFactory(object):
     """
     Basically just a container for KeyConfigurators. make_key will create a
@@ -144,7 +141,8 @@ class Key(object):
         for k, v in self.metadata.items():
             headers['x-amz-meta-' + k] = v
 
-        for k in constants.KEY_HEADERS:
+        for k in ('cache_control', 'content_disposition', 'content_encoding',
+                  'content_type', 'content_language', 'expires'):
             if k in self.__dict__:
                 headers[k.replace('_', '-')] = self.__dict__[k]
 
@@ -183,7 +181,7 @@ class Key(object):
         except AttributeError:
             log.info("upload: {}".format(self.pretty_path))
 
-        if utils.f_sizeof(f) <= MULTIPART_CUTOFF:
+        if utils.f_sizeof(f) <= constants.MULTIPART_CUTOFF:
             self._basic_upload(f)
         else:
             self._multipart_upload(f)
@@ -199,7 +197,7 @@ class Key(object):
         # Upload individual parts
         upload_reqs = []
         parts = []
-        chunks = utils.f_chunk(f, MULTIPART_PART_SIZE)
+        chunks = utils.f_chunk(f, constants.MULTIPART_PART_SIZE)
         for r in range(len(chunks)):
             upload_reqs.append([
                 self._multipart_upload_part,
