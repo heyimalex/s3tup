@@ -212,6 +212,6 @@ class Connection(object):
 
             code = error.find('code').text
             message = error.find('message').text
-            raise S3ResponseError(code, message)
+            raise S3ResponseError(code, message, resp)
 
         return resp
