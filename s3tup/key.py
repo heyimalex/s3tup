@@ -156,6 +156,12 @@ class Key(object):
 
         return headers
 
+    def delete(self):
+        delete_key(self.conn, self.bucket_name, self.name)
+
+    def redirect(self, redirect_url):
+        redirect_key(self.conn, self.bucket_name, self.name, redirect_url)
+
     def sync(self):
         """Sync this object's configuration with its respective key on s3"""
         log.info("sync: {}".format(self.pretty_path))
@@ -165,12 +171,18 @@ class Key(object):
         headers['x-amz-metadata-directive'] = 'REPLACE'
 
         # According to S3 docs, copy response can contain error & info
-        # even if it returns 200 OK. Need to handle this.
+        # even if it returns 200 OK. Need to handle this. However, the
+        # docs don't mention what the error would look like...
         self.make_request('PUT', headers=headers)
         self.sync_acl()
 
     def upload(self, f):
         """Upload file like object to s3 with this key's configuration"""
+        try:
+            log.info("upload: {} <- {}".format(self.pretty_path, f.name))
+        except AttributeError:
+            log.info("upload: {}".format(self.pretty_path))
+
         if utils.f_sizeof(f) <= MULTIPART_CUTOFF:
             self._basic_upload(f)
         else:
@@ -178,24 +190,11 @@ class Key(object):
         self.sync_acl()
 
     def _basic_upload(self, f):
-        try:
-            log.info("upload: {} -> {}".format(f.name, self.pretty_path))
-        except AttributeError:
-            log.info("upload: {}".format(self.pretty_path))
         headers = self.get_headers()
         self.make_request('PUT', headers=headers, data=f)
 
     def _multipart_upload(self, f):
-        try:
-            msg = "multipart upload: {} -> {}".format(f.name, self.pretty_path)
-            log.info(msg)
-        except AttributeError:
-            log.info("multipart upload: {}".format(self.pretty_path))
-
-        # Initiate multipart upload and extract upload_id from response
-        headers = self.get_headers()
-        resp = self.make_request('POST', 'uploads', headers=headers)
-        upload_id = BeautifulSoup(resp.text).find('uploadid').text
+        upload_id = self._initiate_multipart_upload()
 
         # Upload individual parts
         upload_reqs = []
@@ -208,36 +207,39 @@ class Key(object):
                 r+1,
                 upload_id
             ])
-            parts.append({
-                'number': r+1,
-                'etag': hexlify(utils.f_md5(chunks[r]))
-            })
-        self.conn.join(upload_reqs)
+            parts.append((r+1, hexlify(utils.f_md5(chunks[r]))))
+        try:
+            self.conn.join(upload_reqs)
+        except:
+            self._abort_multipart_upload()
+            raise
+        
+        self._complete_multipart_upload(upload_id, parts)        
 
-        # Abort if errors(?)
+    def _initiate_multipart_upload(self):
+        headers = self.get_headers()
+        resp = self.make_request('POST', 'uploads', headers=headers)
+        return BeautifulSoup(resp.text).find('uploadid').text
 
-        # Complete multipart upload
+    def _complete_multipart_upload(self, upload_id, parts):
         data = "<CompleteMultipartUpload>\n"
         for part in parts:
             data += (
                 "<Part>\n"
                 "  <PartNumber>{}</PartNumber>\n"
                 "  <ETag>\"{}\"</ETag>\n"
-                "</Part>\n".format(part['number'], part['etag'])
+                "</Part>\n".format(*part)
             )
         data += "</CompleteMultipartUpload>"
         self.make_request('POST', {'uploadId': upload_id}, data=data)
 
+    def _abort_multipart_upload(self, upload_id):
+        self.make_request('DELETE', {'uploadId': upload_id})
 
     def _multipart_upload_part(self, f, part_num, upload_id):
+        log.info("upload: {} (part {})".format(self.pretty_path, part_num))
         params = {'partNumber': part_num, 'uploadId': upload_id}
         return self.make_request('PUT', params=params, data=f)
-
-    def delete(self):
-        delete_key(self.conn, self.bucket_name, self.name)
-
-    def redirect(self, redirect_url):
-        redirect_key(self.conn, self.bucket_name, self.name, redirect_url)
 
     def sync_acl(self):
         try: acl = self.acl
