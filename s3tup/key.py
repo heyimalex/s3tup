@@ -185,7 +185,7 @@ class Key(object):
 
         if utils.f_sizeof(f) <= MULTIPART_CUTOFF:
             self._basic_upload(f)
-        else:requests stats
+        else:
             self._multipart_upload(f)
         self.sync_acl()
 
