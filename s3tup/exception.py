@@ -9,7 +9,18 @@ class S3ResponseError(Exception):
 
 
 class ActionConflict(Exception):
-    pass
+    def __init__(self, key, action1, action2):
+        msg = "Conflicting actions set on key '{}': ".format(key)
+        for action in (action1, action2):
+            if action['type'] in ('sync', 'delete'):
+                msg += action['type']
+            elif action['type'] == 'redirect':
+                msg += "{} -> {}".format(action['type'], action['url'])
+            elif action['type'] == 'upload':
+                msg += "{} <- {}".format(action['type'], action['path'])
+            msg += " x "
+        msg = msg[:-3]
+        super(ActionConflict, self).__init__(msg)
 
 
 class ConfigLoadError(Exception):

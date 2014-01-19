@@ -4,7 +4,7 @@ import logging
 from bs4 import BeautifulSoup
 
 from s3tup.key import KeyFactory, redirect_key, delete_key
-from s3tup.rsync import ActionPlan
+from s3tup.rsync import RsyncPlanner, ActionPlan
 import s3tup.constants as constants
 
 log = logging.getLogger('s3tup.bucket')
@@ -27,7 +27,7 @@ class Bucket(object):
         self.conn = conn
         self.name = name
         self.key_factory = key_factory or KeyFactory()
-        self.rsync_planner = rsync_planner
+        self.rsync_planner = rsync_planner or RsyncPlanner()
         self.redirects = kwargs.pop('redirects', [])
 
         # Add all kwargs passed in that are named in
@@ -76,28 +76,28 @@ class Bucket(object):
 
         key_names is a list of str key names to be deleted. S3's delete
         operation has a limit of 1000 keys per request, so this method
-        handles paging as well.
+        handles paging automatically as well.
 
         """
         for i in range(0, len(key_names), 1000):
-            data = ('<?xml version="1.0" encoding="UTF-8"?>\n'
-                    '<Delete>\n  <Quiet>true</Quiet>\n')
+            data = ('<?xml version="1.0" encoding="UTF-8"?>'
+                    '<Delete><Quiet>true</Quiet>')
             for k in key_names[i:i+1000]:
                 log.info('delete: s3://{}/{}'.format(self.name, k))
-                data += '  <Object><Key>{}</Key></Object>\n'.format(k)
+                data += '<Object><Key>{}</Key></Object>'.format(k)
             data += '</Delete>'
             # TODO: Make this joinable.
             self.make_request('POST', 'delete', data=data)
 
     # Named get_remote_keys instead of just overriding __iter__
-    # to avoid ambiguity. Returns dicts instead of Key objects for the
+    # to avoid ambiguity. Doesn't return s3tup.key.Key objects for the
     # same reason. Requests can't be parallel as each depends on
     # the marker from the last.
     def get_remote_keys(self, prefix=None):
         """Return list representing all keys in this bucket.
 
-        Each dict returned contains fields 'name', 'md5', 'size', and
-        'modified'. Paging is handled automatically. Optional (str)
+        Each namedtuple returned contains fields 'name', 'md5', 'size',
+        and 'modified'. Paging is handled automatically. Optional (str)
         prefix param will limit the results to those keys prefixed by it.
 
         """
@@ -105,10 +105,13 @@ class Bucket(object):
         keys = {}
         more = True
         marker = None
-        while more is True:
+
+        while more:
+
             params = {'marker': marker, 'prefix': prefix}
-            r = self.conn.make_request('GET', self.name, params=params)
-            root = BeautifulSoup(r.text).find('listbucketresult')
+            resp = self.make_request('GET', params)
+
+            root = BeautifulSoup(resp.text).find('listbucketresult')
             for c in root.find_all('contents'):
                 key = c.find('key').text
                 marker = key
@@ -116,7 +119,9 @@ class Bucket(object):
                 size = int(c.find('size').text)
                 md5 = c.find('etag').text.replace('"', '')
                 keys[key] = KeyTuple(key, md5, size, modified)
+
             more = root.find('istruncated').text == 'true'
+
         return keys
 
     # SYNC METHODS
@@ -147,8 +152,8 @@ class Bucket(object):
             headers = None
         try:
             data = ('<CreateBucketConfiguration '
-                    'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n'
-                    '  <LocationConstraint>{}</LocationConstraint>\n'
+                    'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                    '  <LocationConstraint>{}</LocationConstraint>'
                     '</CreateBucketConfiguration>').format(self.region)
         except AttributeError:
             data = None
@@ -173,7 +178,7 @@ class Bucket(object):
             self.make_request = tmp
 
     def sync_keys(self, dryrun=False, rsync=False):
-        plan = self._make_action_plan(rsync)
+        plan = self._create_action_plan(rsync)
         if not dryrun:
             self._execute_action_plan(plan)
         else:
@@ -186,23 +191,20 @@ class Bucket(object):
             for k in plan.to_delete:
                 log.info("delete: {}".format(k))
 
-    def _make_action_plan(self, rsync=False):
-        remote_keys = self.get_remote_keys()
+    def _create_action_plan(self, rsync=False):
 
-        if self.rsync_planner:
-            plan = self.rsync_planner.plan(remote_keys)
-        else:
-            plan = ActionPlan()
+        remote_keys = self.get_remote_keys()
+        plan = self.rsync_planner.plan(remote_keys)
 
         # Add in redirects
         for key, url in self.redirects:
-            plan.redirect(key, url)
+            plan.add_redirect(key, url)
 
         # Sync all keys with no action yet associated
         affected_keys = set(plan.affected_keys)
         old_keys = set(remote_keys.keys())
         for k in (old_keys-affected_keys):
-            plan.sync(k)
+            plan.add_sync(k)
 
         if rsync:
             plan.remove_actions('sync', 'redirect')
@@ -280,7 +282,7 @@ class Bucket(object):
             data = logging
         else:
             log.info("delete logging configuration")
-            data = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            data = ('<?xml version="1.0" encoding="UTF-8"?>'
                     '<BucketLoggingStatus '
                     'xmlns="http://doc.s3.amazonaws.com/2006-03-01"/>')
         return self.make_request('PUT', 'logging', data=data)
@@ -338,8 +340,8 @@ class Bucket(object):
             log.info("suspend versioning")
             status = 'Suspended'
         data = ('<VersioningConfiguration '
-                'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n'
-                '  <Status>{}</Status>\n'
+                'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                '  <Status>{}</Status>'
                 '</VersioningConfiguration>').format(status)
         return self.make_request('PUT', 'versioning', data=data)
 

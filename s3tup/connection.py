@@ -16,7 +16,7 @@ monkey.patch_all(thread=False, select=False)
 # I imagine this isn't a good thing to do, but pushing a
 # traceback to stdout on a cli is a no go.
 from gevent.hub import Hub
-Hub.print_exception = lambda *args, **kwargs:None
+Hub.print_exception = lambda *args, **kwargs: None
 
 from bs4 import BeautifulSoup
 from requests import Session, Request
@@ -27,6 +27,7 @@ from s3tup.exception import S3ResponseError, AccessKeyIdNotFound, \
 import s3tup.utils as utils
 
 log = logging.getLogger('s3tup.connection')
+
 
 class Connection(object):
 
@@ -49,7 +50,7 @@ class Connection(object):
         self.concurrency = concurrency
         self._joined = False
 
-        self.stats = {'GET':0, 'POST':0, 'PUT':0, 'DELETE':0, 'HEAD':0}
+        self.stats = {'GET': 0, 'POST': 0, 'PUT': 0, 'DELETE': 0, 'HEAD': 0}
 
     @property
     def concurrency(self):
@@ -84,7 +85,7 @@ class Connection(object):
         self._joined = old
 
     def join(self, functions):
-        if self.concurrency <= 0: # Useful for debugging
+        if self.concurrency <= 0:  # Useful for debugging
             out = []
             for f in functions:
                 if hasattr(f, '__iter__'):
@@ -110,7 +111,7 @@ class Connection(object):
                      headers=None):
         # Remove params that are set to None
         if isinstance(params, dict):
-            for k,v in params.copy().items():
+            for k, v in params.copy().items():
                 if v is None:
                     params.pop(k)
 
@@ -141,8 +142,10 @@ class Connection(object):
         else:
             md5 = ''
 
-        try: content_type = headers['Content-Type']
-        except KeyError: content_type = ''
+        try:
+            content_type = headers['Content-Type']
+        except KeyError:
+            content_type = ''
 
         date = formatdate(timeval=None, localtime=False, usegmt=True)
         headers['x-amz-date'] = date
@@ -166,7 +169,7 @@ class Connection(object):
         string_to_sign = method.upper() + '\n'
         string_to_sign += md5 + '\n'
         string_to_sign += content_type + '\n'
-        string_to_sign += '\n' # date is always set through x-amz-date
+        string_to_sign += '\n'  # date is always set through x-amz-date
         string_to_sign += canonicalized_amz_headers + canonicalized_resource
 
         # Create signature
@@ -192,11 +195,11 @@ class Connection(object):
 
         # Send request
         resp = Session().send(req)
-        
+
         # Update stats, log response data.
         self.stats[method.upper()] += 1
         log.debug('response: {} ({} {})'.format(resp.status_code, method, url))
-        
+
         # Handle errors
         if resp.status_code/100 != 2:
             soup = BeautifulSoup(resp.text)
@@ -207,7 +210,7 @@ class Connection(object):
             for c in error.children:
                 error_name = c.name
                 error_message = c.text.encode('unicode_escape')
-                log_message +='  {}: {}\n'.format(error_name, error_message)
+                log_message += '  {}: {}\n'.format(error_name, error_message)
             log.debug(log_message)
 
             code = error.find('code').text

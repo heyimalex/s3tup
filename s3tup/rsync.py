@@ -5,66 +5,58 @@ import os
 
 from s3tup.exception import ActionConflict
 import s3tup.utils as utils
+import s3tup.constants as constants
 
 log = logging.getLogger('s3tup.rsync')
 
+
 class ActionPlan(object):
-    """ Stores a set of actions to be executed on keys.
+
+    """Maintains a set of actions to be executed on keys.
 
     Buckets know how to execute action plans, and action
     plans know when there are conflicting actions on keys.
+    Actions are added to action plans
+
     """
 
     def __init__(self):
         self._actions = {}
 
     # Ugly... but works and passes tests
-    def _add_action(self, action_type, key, *args):
-        new_val = [action_type,]+list(args)
-        old_val = self._actions.pop(key, None)
+    def _add_action(self, key, action_type, **kwargs):
 
-        if old_val == None:
-            self._actions[key] = new_val
-        elif old_val[0] == 'delete':
-            if action_type != 'delete':
-                # don't complain if delete is overwritten
-                pass
-            self._actions[key] = new_val
+        new_action = {'type': action_type}
+        new_action.update(kwargs)
+        old_action = self._actions.pop(key, None)
+
+        if old_action is None:
+            self._actions[key] = new_action
+        elif old_action == new_action:
+            self._actions[key] = old_action
+        elif old_action['type'] == 'delete':
+            self._actions[key] = new_action
+        elif new_action['type'] == 'delete':
+            self._actions[key] = old_action
         else:
-            if action_type == 'delete':
-                self._actions[key] = old_val
-            else:
-                if new_val == old_val:
-                    self._actions[key] = old_val
-                else:
-                    msg = "Conflicting actions set for key '{}':\n".format(key)
-                    for v in (new_val, old_val):
-                        if v[0] in ("delete", "sync"):
-                            msg += '{}, '.format(v[0])
-                        else:
-                            msg += '{} -> {}, '.format(v[0], v[1])
-                    msg = msg[:-2]
-                    raise ActionConflict(msg)
+            raise ActionConflict(key, new_action, old_action)
 
     def remove_actions(self, *action_types):
-        toremove = []
-        for key,v in self._actions.items():
-            if v[0] in action_types:
-                toremove.append(key)
-        for k in toremove:
-            self._actions.pop(k) #
+        for k, v in list(self._actions.items()):
+            if v['type'] in action_types:
+                self._actions.pop(k)
 
-    def delete(self, key):
-        self._add_action('delete', key)
+    def add_delete(self, key):
+        self._add_action(key, 'delete')
 
-    def sync(self, key):
-        self._add_action('sync', key)
+    def add_sync(self, key):
+        self._add_action(key, 'sync')
 
-    def redirect(self, key, url):
-        self._add_action('redirect', key, url)
+    def add_redirect(self, key, url):
+        self._add_action(key, 'redirect', url=url)
 
-    def upload(self, key, path):
-        self._add_action('upload', key, path)
+    def add_upload(self, key, path):
+        self._add_action(key, 'upload', path=path)
 
     @property
     def affected_keys(self):
@@ -72,40 +64,40 @@ class ActionPlan(object):
 
     @property
     def to_upload(self):
-        for k,v in self._actions.items():
-            if v[0] == 'upload':
-                yield k, v[1]
+        for k, v in self._actions.items():
+            if v['type'] == 'upload':
+                yield k, v['path']
 
     @property
     def to_redirect(self):
-        for k,v in self._actions.items():
-            if v[0] == 'redirect':
-                yield k, v[1]
+        for k, v in self._actions.items():
+            if v['type'] == 'redirect':
+                yield k, v['url']
 
     @property
     def to_delete(self):
-        for k,v in self._actions.items():
-            if v[0] == 'delete':
+        for k, v in self._actions.items():
+            if v['type'] == 'delete':
                 yield k
 
     @property
     def to_sync(self):
-        for k,v in self._actions.items():
-            if v[0] == 'sync':
+        for k, v in self._actions.items():
+            if v['type'] == 'sync':
                 yield k
 
     def __add__(self, other):
         new = ActionPlan()
         for old in (other, self):
-            for key,v in old._actions.items():
-                if v[0] == 'redirect':
-                    new.redirect(key, v[1])
-                if v[0] == 'upload':
-                    new.upload(key, v[1])
-                if v[0] == 'delete':
-                    new.delete(key)
-                if v[0] == 'sync':
-                    new.sync(key)
+            for key, v in old._actions.items():
+                if v['type'] == 'redirect':
+                    new.add_redirect(key, v['url'])
+                if v['type'] == 'upload':
+                    new.add_upload(key, v['path'])
+                if v['type'] == 'delete':
+                    new.add_delete(key)
+                if v['type'] == 'sync':
+                    new.add_sync(key)
         return new
 
     def __iadd__(self, other):
@@ -124,6 +116,7 @@ class RsyncPlanner(object):
             plan += config.plan(remote_keys)
         return plan
 
+
 class RsyncConfig(object):
 
     def __init__(self, src=None, dest=None, delete=False, matcher=None):
@@ -133,10 +126,14 @@ class RsyncConfig(object):
         self.matcher = matcher or utils.Matcher()
 
     def plan(self, remote_keys):
+
         remote_key_names = set(remote_keys.keys())
+
         new = set()
+        removed = set()
         modified = set()
         unmodified = set()
+
         for k in self._get_local_key_names():
             if k not in remote_key_names:
                 new.add(k)
@@ -149,28 +146,13 @@ class RsyncConfig(object):
 
         plan = ActionPlan()
         for k in new | modified:
-            plan.upload(k, self._get_local_path_from_key(k))
+            plan.add_upload(k, self._get_local_path_from_key(k))
         for k in unmodified:
-            plan.sync(k)
+            plan.add_sync(k)
         if self.delete:
             for k in removed:
-                plan.delete(k)
+                plan.add_delete(k)
         return plan
-
-    def _is_unmodified(self, s3_key):
-        local_path = self._get_local_path_from_key(s3_key.name)
-        with open(local_path, 'rb') as f:
-            if utils.f_sizeof(f) != s3_key.size:
-                return False
-            if not '-' in s3_key.md5:
-                local_md5 = hexlify(utils.f_md5(f))
-            else:
-                chunks = utils.f_chunk(f, 5242880)
-                m = hashlib.md5()
-                for chunk in chunks:
-                    m.update(utils.f_md5(chunk))
-                local_md5 = "{}-{}".format(hexlify(m.digest()), len(chunks))
-            return local_md5 == s3_key.md5        
 
     def _get_local_key_names(self):
         src = self.src or '.'
@@ -184,3 +166,18 @@ class RsyncConfig(object):
         src = self.src or '.'
         dest = self.dest or '.'
         return os.path.normpath(os.path.join(src, os.path.relpath(key, dest)))
+
+    def _is_unmodified(self, s3_key):
+        local_path = self._get_local_path_from_key(s3_key.name)
+        with open(local_path, 'rb') as f:
+            if utils.f_sizeof(f) != s3_key.size:
+                return False
+            if not '-' in s3_key.md5:
+                local_md5 = hexlify(utils.f_md5(f))
+            else:
+                chunks = utils.f_chunk(f, constants.MULTIPART_PART_SIZE)
+                m = hashlib.md5()
+                for chunk in chunks:
+                    m.update(utils.f_md5(chunk))
+                local_md5 = "{}-{}".format(hexlify(m.digest()), len(chunks))
+            return local_md5 == s3_key.md5

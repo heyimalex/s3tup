@@ -10,18 +10,16 @@ import s3tup.constants as constants
 
 log = logging.getLogger('s3tup.key')
 
-class KeyFactory(object):
-    """
-    Basically just a container for KeyConfigurators. make_key will create a
-    key based on the input parameters and then run each configurator on it
-    sequentially, returning a fully configured key.
 
-    """
+class KeyFactory(object):
+
+    """Container for KeyConfigurators."""
+
     def __init__(self, configurators=None):
         self.configurators = configurators or []
 
     def make_key(self, conn, bucket_name, key_name,):
-        """Return a properly configured key"""
+        """Return a properly configured key."""
         key = Key(conn, bucket_name, key_name)
         return self.configure_key(key)
 
@@ -33,6 +31,9 @@ class KeyFactory(object):
 
 
 class KeyConfigurator(object):
+
+    """Configures Key objects."""
+
     def __init__(self, matcher=None, **kwargs):
         self.matcher = matcher or utils.Matcher()
         for k, v in kwargs.items():
@@ -44,17 +45,20 @@ class KeyConfigurator(object):
                 raise TypeError(msg)
 
     def effects_key(self, key_name):
-        """Return whether this configurator effects key_name"""
+        """Return whether this configurator effects key_name."""
         return self.matcher.matches(key_name)
 
     def configure_key(self, key):
-        """Return the input key with all configurations applied"""
+        """Return the input key with all configurations applied."""
         for attr in constants.KEY_ATTRS:
             if attr in self.__dict__ and attr != 'metadata':
                 key.__dict__[attr] = self.__dict__[attr]
-        try: key.metadata.update(self.metadata)
-        except AttributeError: pass
+        try:
+            key.metadata.update(self.metadata)
+        except AttributeError:
+            pass
         return key
+
 
 # Both deletion and redirection disregard key configuration,
 # so they can be standalone methods.
@@ -64,22 +68,27 @@ def delete_key(conn, bucket, key):
     log.info('delete: {}'.format(path))
     conn.make_request('DELETE', bucket, key)
 
+
 def redirect_key(conn, bucket, key, redirect_url):
     path = key_pretty_path(bucket, key)
     log.info('redirect: {} -> {}'.format(path, redirect_url))
     headers = {'x-amz-website-redirect-location': redirect_url}
     conn.make_request('PUT', bucket, key, headers=headers)
 
+
 def key_pretty_path(bucket, key):
     return 's3://{}/{}'.format(bucket, key)
 
+
 class Key(object):
-    """
-    Encapsulates configuration for a particular s3 key. It has attributes
-    (all defined in constants.KEY_ATTRS) that you can set, delete, modify, 
-    and then sync to s3 using the sync or upload methods.
+
+    """Encapsulates configuration for an s3 key.
+
+    It has attributes (all defined in constants.KEY_ATTRS) that you can set,
+    delete, modify, and then sync to s3 using the sync or upload methods.
 
     """
+
     def __init__(self, conn, bucket_name, key_name, **kwargs):
         self.conn = conn
         self.name = key_name
@@ -90,9 +99,9 @@ class Key(object):
         self.encrypted = kwargs.pop('encrypted', False)
         self.metadata = kwargs.pop('metadata', {})
 
-        # Add all kwargs passed in that are named in 
+        # Add all kwargs passed in that are named in
         # constants.KEY_ATTRS to this object instance
-        for k,v in kwargs.items():
+        for k, v in kwargs.items():
             if k in constants.KEY_ATTRS:
                 self.__dict__[k] = v
             else:
@@ -105,9 +114,8 @@ class Key(object):
         return key_pretty_path(self.bucket_name, self.name)
 
     def make_request(self, method, params=None, data=None, headers=None):
-        """ Convenience method for self.conn.make_request; has bucket and key
-            already filled in.
-        """
+        """Convenience method for self.conn.make_request."""
+        # Has bucket and key fields already filled in.
         return self.conn.make_request(
             method,
             self.bucket_name,
@@ -118,7 +126,13 @@ class Key(object):
         )
 
     def get_headers(self):
-        """Return the headers associated with this key"""
+        """Return the headers associated with this key.
+
+        This method takes the attributes set on the key, converts them into
+        appropriate headers that s3 will recognize, and then returns those
+        headers in a dict.
+
+        """
         headers = {}
 
         try:
@@ -162,7 +176,7 @@ class Key(object):
         redirect_key(self.conn, self.bucket_name, self.name, redirect_url)
 
     def sync(self):
-        """Sync this object's configuration with its respective key on s3"""
+        """Sync this object's configuration with its respective key on s3."""
         log.info("sync: {}".format(self.pretty_path))
 
         headers = self.get_headers()
@@ -176,7 +190,7 @@ class Key(object):
         self.sync_acl()
 
     def upload(self, f):
-        """Upload file like object to s3 with this key's configuration"""
+        """Upload file like object to s3 with this key's configuration."""
         try:
             log.info("upload: {} <- {}".format(self.pretty_path, f.name))
         except AttributeError:
@@ -212,8 +226,8 @@ class Key(object):
         except:
             self._abort_multipart_upload(upload_id)
             raise
-        
-        self._complete_multipart_upload(upload_id, parts)        
+
+        self._complete_multipart_upload(upload_id, parts)
 
     def _initiate_multipart_upload(self):
         headers = self.get_headers()
@@ -241,14 +255,15 @@ class Key(object):
             raise
 
     def _multipart_upload_part(self, f, part_num, upload_id):
-        log.info("upload: {} (part {})".format(self.pretty_path, part_num))
         params = {'partNumber': part_num, 'uploadId': upload_id}
         return self.make_request('PUT', params=params, data=f)
 
     def sync_acl(self):
-        try: acl = self.acl
-        except AttributeError: return False
-        
+        try:
+            acl = self.acl
+        except AttributeError:
+            return False
+
         log.info("sync acl: {}".format(self.pretty_path))
         if acl is not None:
             self.make_request('PUT', 'acl', data=acl)
