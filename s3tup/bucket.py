@@ -9,15 +9,19 @@ import s3tup.constants as constants
 
 log = logging.getLogger('s3tup.bucket')
 
+
 class Bucket(object):
-    """
-    Encapsulates configuration for an s3 bucket and its keys. It contains a
-    KeyFactory, which handles key configuration, an RsyncPlanner, which
-    decides which actions to take on keys, and attributes (listed
-    in constants.BUCKET_ATTRS) that you can set, delete, modify, and then
-    sync to s3 using the various sync methods provided.
+
+    """Encapsulates configuration for an s3 bucket and its keys.
+
+    Buckets contain a KeyFactory, which handles key configuration,
+    an RsyncPlanner, which decides which actions to take on keys,
+    and attributes (listed in constants.BUCKET_ATTRS) that you can set,
+    delete, modify, and then sync to s3 using the various sync methods
+    provided.
 
     """
+
     def __init__(self, conn, name, key_factory=None,
                  rsync_planner=None, **kwargs):
         self.conn = conn
@@ -26,9 +30,9 @@ class Bucket(object):
         self.rsync_planner = rsync_planner
         self.redirects = kwargs.pop('redirects', [])
 
-        # Add all kwargs passed in that are named in 
+        # Add all kwargs passed in that are named in
         # constants.BUCKET_ATTRS to this object instance
-        for k,v in kwargs.items():
+        for k, v in kwargs.items():
             if k in constants.BUCKET_ATTRS:
                 self.__dict__[k] = v
             else:
@@ -37,8 +41,8 @@ class Bucket(object):
                 raise TypeError(msg)
 
     def make_request(self, method, params=None, data=None, headers=None):
-        """Convenience method for self.conn.make_request; has the bucket and
-        key fields already filled in."""
+        """Convenience method for self.conn.make_request."""
+        # Has bucket and key fields already filled in.
         return self.conn.make_request(
             method=method,
             bucket=self.name,
@@ -71,7 +75,7 @@ class Bucket(object):
         """Delete a list of keys from this bucket.
 
         key_names is a list of str key names to be deleted. S3's delete
-        operation has a limit of 1000 keys per request so this method
+        operation has a limit of 1000 keys per request, so this method
         handles paging as well.
 
         """
@@ -90,7 +94,7 @@ class Bucket(object):
     # same reason. Requests can't be parallel as each depends on
     # the marker from the last.
     def get_remote_keys(self, prefix=None):
-        """Generate list of dicts representing all keys in this s3 bucket.
+        """Return list representing all keys in this bucket.
 
         Each dict returned contains fields 'name', 'md5', 'size', and
         'modified'. Paging is handled automatically. Optional (str)
@@ -118,7 +122,7 @@ class Bucket(object):
     # SYNC METHODS
 
     def sync(self, dryrun=False, rsync=False):
-        """Sync everything.
+        """Sync all of this bucket's configurations.
 
         Takes every applicable attribute set on this Bucket object and
         configures its respective s3 bucket (defined by self.name) to match
@@ -136,6 +140,7 @@ class Bucket(object):
         log.info("bucket '{}' sucessfully synced!\n".format(self.name))
 
     def create(self):
+        """Create this bucket."""
         try:
             headers = {'x-amz-acl': self.canned_acl}
         except AttributeError:
@@ -152,7 +157,7 @@ class Bucket(object):
     def sync_bucket(self, dryrun=False):
         if dryrun:
             tmp = self.make_request
-            self.make_request = lambda *args, **kwargs:None
+            self.make_request = lambda *args, **kwargs: None
         self.conn.join([
             self.sync_acl,
             self.sync_cors,
@@ -225,20 +230,24 @@ class Bucket(object):
     # looking for details on what values are allowed check there.
 
     def sync_acl(self):
-        try: acl = self.acl
-        except AttributeError: return False
-        
+        try:
+            acl = self.acl
+        except AttributeError:
+            return False
+
         if acl is not None:
             log.info("set xml acl")
             return self.make_request('PUT', 'acl', data=acl)
         else:
             log.info("revert to default acl")
-            return self.make_request('PUT', 'acl',
-                                     headers={"x-amz-acl":"private"})
+            headers = {"x-amz-acl": "private"}
+            return self.make_request('PUT', 'acl', headers=headers)
 
     def sync_cors(self):
-        try: cors = self.cors
-        except AttributeError: return False
+        try:
+            cors = self.cors
+        except AttributeError:
+            return False
 
         if cors is not None:
             log.info("set cors configuration")
@@ -248,8 +257,10 @@ class Bucket(object):
             return self.make_request('DELETE', 'cors')
 
     def sync_lifecycle(self):
-        try: lifecycle = self.lifecycle
-        except AttributeError: return False
+        try:
+            lifecycle = self.lifecycle
+        except AttributeError:
+            return False
 
         if lifecycle is not None:
             log.info("set lifecycle configuration")
@@ -259,8 +270,10 @@ class Bucket(object):
             return self.make_request('DELETE', 'lifecycle')
 
     def sync_logging(self):
-        try: logging = self.logging
-        except AttributeError: return False
+        try:
+            logging = self.logging
+        except AttributeError:
+            return False
 
         if logging is not None:
             log.info("set logging configuration")
@@ -273,8 +286,10 @@ class Bucket(object):
         return self.make_request('PUT', 'logging', data=data)
 
     def sync_notification(self):
-        try: notification = self.notification
-        except AttributeError: return False
+        try:
+            notification = self.notification
+        except AttributeError:
+            return False
 
         if notification is not None:
             log.info("set notification configuration")
@@ -285,8 +300,10 @@ class Bucket(object):
         return self.make_request('PUT', 'notification', data=data)
 
     def sync_policy(self):
-        try: policy = self.policy
-        except AttributeError: return False
+        try:
+            policy = self.policy
+        except AttributeError:
+            return False
 
         if policy is not None:
             log.info("set bucket policy")
@@ -296,8 +313,10 @@ class Bucket(object):
             return self.make_request('DELETE', 'policy')
 
     def sync_tagging(self):
-        try: tagging = self.tagging
-        except AttributeError: return False
+        try:
+            tagging = self.tagging
+        except AttributeError:
+            return False
 
         if tagging is not None:
             log.info("set bucket tags")
@@ -307,8 +326,10 @@ class Bucket(object):
             return self.make_request('DELETE', 'tagging')
 
     def sync_versioning(self):
-        try: versioning = self.versioning
-        except AttributeError: return False
+        try:
+            versioning = self.versioning
+        except AttributeError:
+            return False
 
         if versioning:
             log.info("enable versioning")
@@ -323,8 +344,10 @@ class Bucket(object):
         return self.make_request('PUT', 'versioning', data=data)
 
     def sync_website(self):
-        try: website = self.website
-        except AttributeError: return False
+        try:
+            website = self.website
+        except AttributeError:
+            return False
 
         if website is not None:
             log.info("set website configuration")
