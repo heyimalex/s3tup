@@ -138,9 +138,7 @@ def parse_bucket(config):
             return Bucket(conn, bucket_name, key_factory, rsync_planner,
                           **config)
         except TypeError as e:
-            invalid = e.message[e.message.index("'")+1:-1]
-            msg = "Invalid field '{}'".format(invalid)
-            raise ConfigParseError(msg)
+            raise convert_type_error(e)
 
 
 @parse_method
