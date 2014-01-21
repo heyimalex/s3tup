@@ -61,9 +61,9 @@ class Bucket(object):
         key = self.make_key(key_name)
         key.sync()
 
-    def upload_key(self, key_name, f):
+    def upload_key(self, key_name, path):
         key = self.make_key(key_name)
-        key.upload(f)
+        key.upload(open(path, 'rb'))
 
     def redirect_key(self, key_name, redirect_url):
         redirect_key(self.conn, self.name, key_name, redirect_url)
@@ -214,7 +214,7 @@ class Bucket(object):
     def _execute_action_plan(self, plan):
         actions = []
         for k, path in plan.to_upload:
-            actions.append([self.upload_key, k, open(path, 'rb')])
+            actions.append([self.upload_key, k, path])
         for k in plan.to_sync:
             actions.append([self.sync_key, k])
         for k, url in plan.to_redirect:
