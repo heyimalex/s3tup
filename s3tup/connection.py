@@ -32,7 +32,7 @@ log = logging.getLogger('s3tup.connection')
 class Connection(object):
 
     def __init__(self, access_key_id=None, secret_access_key=None,
-                 concurrency=5):
+                 hostname=None, concurrency=5):
         if access_key_id is None:
             try:
                 access_key_id = os.environ['AWS_ACCESS_KEY_ID']
@@ -43,9 +43,12 @@ class Connection(object):
                 secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
             except KeyError:
                 raise SecretAccessKeyNotFound()
+        if hostname is None:
+            hostname = "s3.amazonaws.com"
 
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
+        self.hostname = hostname
 
         self.concurrency = concurrency
         self._joined = False
@@ -116,7 +119,7 @@ class Connection(object):
                     params.pop(k)
 
         # Construct target url
-        url = 'http://{}.s3.amazonaws.com'.format(bucket)
+        url = 'http://{}.{}'.format(bucket, self.hostname)
         url += '/{}'.format(key) if key is not None else '/'
         if isinstance(params, dict) and len(params) > 0:
             url += '?{}'.format(urllib.urlencode(params))
@@ -128,7 +131,7 @@ class Connection(object):
             headers = {}
         headers = CaseInsensitiveDict(headers)
 
-        headers['Host'] = '{}.s3.amazonaws.com'.format(bucket)
+        headers['Host'] = '{}.{}'.format(bucket, self.hostname)
 
         if data is not None:
             try:

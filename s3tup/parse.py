@@ -119,7 +119,11 @@ def parse_bucket(config):
 
     access_key_id = config.pop('access_key_id', None)
     secret_access_key = config.pop('secret_access_key', None)
-    conn = Connection(access_key_id, secret_access_key)
+    if 'hostname' in config:
+        hostname = config.pop('hostname', None)
+    else:
+        hostname = "s3.amazonaws.com"
+    conn = Connection(access_key_id, secret_access_key, hostname)
 
     with exception_ctx(bucket_name):
         if 'key_config' in config:
@@ -136,7 +140,7 @@ def parse_bucket(config):
         # Bucket will throw TypeError if it gets unknown kwargs.
         try:
             return Bucket(conn, bucket_name, key_factory, rsync_planner,
-                          **config)
+                          hostname=hostname, **config)
         except TypeError as e:
             raise convert_type_error(e)
 
