@@ -34,6 +34,7 @@ BUCKET_ATTRS = (
     'acl',
     'canned_acl',
     'cors',
+    'hostname',
     'lifecycle',
     'logging',
     'notification',
