@@ -71,7 +71,7 @@ def delete_key(conn, bucket, key):
 
 def redirect_key(conn, bucket, key, redirect_url):
     path = key_pretty_path(bucket, key)
-    log.info('redirect: {} -> {}'.format(path, redirect_url))
+    log.info('redirect: {} \n{} {}'.format(path, "to".rjust(12), redirect_url))
     headers = {'x-amz-website-redirect-location': redirect_url}
     conn.make_request('PUT', bucket, key, headers=headers)
 
@@ -191,10 +191,14 @@ class Key(object):
 
     def upload(self, f):
         """Upload file like object to s3 with this key's configuration."""
+
+        msg = "upload: {}".format(self.pretty_path)
         try:
-            log.info("upload: {} <- {}".format(self.pretty_path, f.name))
+            msg += "\n" + "from ".rjust(13) + f.name
         except AttributeError:
-            log.info("upload: {}".format(self.pretty_path))
+            pass
+        log.info(msg)
+            
 
         if utils.f_sizeof(f) <= constants.MULTIPART_CUTOFF:
             self._basic_upload(f)
