@@ -4,7 +4,7 @@ import logging
 from bs4 import BeautifulSoup
 
 from s3tup.key import KeyFactory, redirect_key, delete_key
-from s3tup.rsync import RsyncPlanner, ActionPlan
+from s3tup.rsync import RsyncPlanner
 import s3tup.constants as constants
 
 log = logging.getLogger('s3tup.bucket')
