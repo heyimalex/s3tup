@@ -117,7 +117,6 @@ class Connection(object):
         # Remove params that are set to None
         if params is None:
             params = {}
-
         for k, v in params.copy().items():
             if v is None:
                 params.pop(k)
@@ -165,7 +164,8 @@ class Connection(object):
         amz_keys = [k for k in list(headers.keys()) if k.startswith('x-amz-')]
         for k in sorted(amz_keys):
             v = headers[k].strip()
-            canonicalized_amz_headers += '{}:{}\n'.format(k.lower(), v)
+            k = k.lower()
+            canonicalized_amz_headers += '{}:{}\n'.format(k, v)
 
         # Construct canonicalized resource string
         canonicalized_resource = '/' + bucket
@@ -181,7 +181,6 @@ class Connection(object):
         string_to_sign += content_type + '\n'
         string_to_sign += '\n'  # date is always set through x-amz-date
         string_to_sign += canonicalized_amz_headers + canonicalized_resource
-        print(repr(string_to_sign))
 
         # Create signature
         h = hmac.new(self.secret_access_key, string_to_sign, hashlib.sha1)
@@ -199,6 +198,7 @@ class Connection(object):
         # Combine into a single message so we don't have to bother with
         # locking to make lines appear together.
         log_message = '{} {}\n'.format(method, url)
+        log_message += 'string to sign: {}\n'.format(repr(string_to_sign))
         log_message += 'headers:'
         for k in sorted(req.headers.keys()):
             log_message += '\n {}: {}'.format(k, req.headers[k])
