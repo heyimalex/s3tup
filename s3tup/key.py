@@ -113,13 +113,15 @@ class Key(object):
     def pretty_path(self):
         return key_pretty_path(self.bucket_name, self.name)
 
-    def make_request(self, method, params=None, data=None, headers=None):
+    def make_request(self, method, subresource=None, params=None,
+                    data=None, headers=None):
         """Convenience method for self.conn.make_request."""
         # Has bucket and key fields already filled in.
         return self.conn.make_request(
             method,
             self.bucket_name,
             self.name,
+            subresource=subresource,
             params=params,
             data=data,
             headers=headers
@@ -248,11 +250,11 @@ class Key(object):
                 "</Part>\n".format(*part)
             )
         data += "</CompleteMultipartUpload>"
-        self.make_request('POST', {'uploadId': upload_id}, data=data)
+        self.make_request('POST', params={'uploadId': upload_id}, data=data)
 
     def _abort_multipart_upload(self, upload_id):
         try:
-            self.make_request('DELETE', {'uploadId': upload_id})
+            self.make_request('DELETE', params={'uploadId': upload_id})
         except S3ResponseError as e:
             if e.error_code == 'NoSuchUpload':
                 return

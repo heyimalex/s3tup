@@ -40,13 +40,15 @@ class Bucket(object):
                        " argument '{}'".format(k))
                 raise TypeError(msg)
 
-    def make_request(self, method, params=None, data=None, headers=None):
+    def make_request(self, method, subresource=None, params=None, data=None,
+                     headers=None):
         """Convenience method for self.conn.make_request."""
         # Has bucket and key fields already filled in.
         return self.conn.make_request(
             method=method,
             bucket=self.name,
             key=None,
+            subresource=subresource,
             params=params,
             data=data,
             headers=headers
@@ -109,7 +111,7 @@ class Bucket(object):
         while more:
 
             params = {'marker': marker, 'prefix': prefix}
-            resp = self.make_request('GET', params)
+            resp = self.make_request('GET', params=params)
 
             root = BeautifulSoup(resp.text).find('listbucketresult')
             for c in root.find_all('contents'):

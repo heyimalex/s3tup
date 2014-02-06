@@ -32,7 +32,7 @@ log = logging.getLogger('s3tup.connection')
 class Connection(object):
 
     def __init__(self, access_key_id=None, secret_access_key=None,
-                 hostname=None, concurrency=5):
+                 hostname=None, temporary_security_token=None, concurrency=5):
         if access_key_id is None:
             try:
                 access_key_id = os.environ['AWS_ACCESS_KEY_ID']
@@ -48,8 +48,9 @@ class Connection(object):
 
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
-        self.hostname = hostname
 
+        self.hostname = hostname
+        self.temporary_security_token = temporary_security_token
         self.concurrency = concurrency
         self._joined = False
 
@@ -110,21 +111,24 @@ class Connection(object):
             return [g.get() for g in greenlets]
 
     # Here be dragons
-    def make_request(self, method, bucket, key=None, params=None, data=None,
-                     headers=None):
+    def make_request(self, method, bucket, key=None, subresource=None,
+                     params=None, data=None, headers=None):
+
         # Remove params that are set to None
-        if isinstance(params, dict):
-            for k, v in params.copy().items():
-                if v is None:
-                    params.pop(k)
+        if params is None:
+            params = {}
+
+        for k, v in params.copy().items():
+            if v is None:
+                params.pop(k)
 
         # Construct target url
         url = 'http://{}.{}'.format(bucket, self.hostname)
         url += '/{}'.format(key) if key is not None else '/'
-        if isinstance(params, dict) and len(params) > 0:
+        if subresource is not None:
+            url += '?{}'.format(subresource)
+        elif len(params) > 0:
             url += '?{}'.format(urllib.urlencode(params))
-        elif isinstance(params, basestring):
-            url += '?{}'.format(params)
 
         # Make headers case insensitive
         if headers is None:
@@ -132,6 +136,9 @@ class Connection(object):
         headers = CaseInsensitiveDict(headers)
 
         headers['Host'] = '{}.{}'.format(bucket, self.hostname)
+
+        if self.temporary_security_token is not None:
+            headers['x-amz-security-token'] = self.temporary_security_token
 
         if data is not None:
             try:
@@ -163,9 +170,9 @@ class Connection(object):
         # Construct canonicalized resource string
         canonicalized_resource = '/' + bucket
         canonicalized_resource += '/' if key is None else '/{}'.format(key)
-        if isinstance(params, basestring):
-            canonicalized_resource += '?{}'.format(params)
-        elif isinstance(params, dict) and len(params) > 0:
+        if subresource is not None:
+            canonicalized_resource += '?{}'.format(subresource)
+        elif len(params) > 0:
             canonicalized_resource += '?{}'.format(urllib.urlencode(params))
 
         # Construct string to sign
