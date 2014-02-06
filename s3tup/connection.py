@@ -123,7 +123,7 @@ class Connection(object):
                 params.pop(k)
 
         # Construct target url
-        url = 'http://{}.{}'.format(bucket, self.hostname)
+        url = 'http://{}/{}'.format(self.hostname, bucket)
         url += '/{}'.format(key) if key is not None else '/'
         if subresource is not None:
             url += '?{}'.format(subresource)
@@ -135,7 +135,7 @@ class Connection(object):
             headers = {}
         headers = CaseInsensitiveDict(headers)
 
-        headers['Host'] = '{}.{}'.format(bucket, self.hostname)
+        headers['Host'] = self.hostname
 
         if self.temporary_security_token is not None:
             headers['x-amz-security-token'] = self.temporary_security_token
@@ -181,6 +181,7 @@ class Connection(object):
         string_to_sign += content_type + '\n'
         string_to_sign += '\n'  # date is always set through x-amz-date
         string_to_sign += canonicalized_amz_headers + canonicalized_resource
+        print(repr(string_to_sign))
 
         # Create signature
         h = hmac.new(self.secret_access_key, string_to_sign, hashlib.sha1)
