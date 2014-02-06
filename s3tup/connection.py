@@ -95,15 +95,12 @@ class Connection(object):
         
 
     def join(self, functions):
-        if self.concurrency <= 0:  # Useful for debugging
-            out = []
-            for f in functions:
-                if hasattr(f, '__iter__'):
-                    out.append(f[0](*f[1:]))
-                else:
-                    out.append(f())
-            return out
+        if self.concurrency > 0:
+            return self._concurrent_join(functions)
+        else:
+            return self._linear_join(functions)
 
+    def _concurrent_join(self, functions):
         with self.joincontext():
             greenlets = []
             for f in functions:
@@ -115,6 +112,16 @@ class Connection(object):
                 greenlets.append(greenlet)
             gevent.joinall(greenlets, raise_error=True)
             return [g.get() for g in greenlets]
+
+    # Useful for debugging
+    def _linear_join(self, functions):
+        out = []
+        for f in functions:
+            if hasattr(f, '__iter__'):
+                out.append(f[0](*f[1:]))
+            else:
+                out.append(f())
+        return out
 
     # Here be dragons
     def make_request(self, method, bucket, key=None, subresource=None,
