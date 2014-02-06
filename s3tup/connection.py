@@ -55,6 +55,9 @@ class Connection(object):
         self.concurrency = concurrency
         self._joined = False
 
+        self.reset_stats()
+
+    def reset_stats(self):
         self.stats = {'GET': 0, 'POST': 0, 'PUT': 0, 'DELETE': 0, 'HEAD': 0}
 
     @property
