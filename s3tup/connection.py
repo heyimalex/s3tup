@@ -51,6 +51,7 @@ class Connection(object):
 
         self.hostname = hostname
         self.temporary_security_token = temporary_security_token
+
         self.concurrency = concurrency
         self._joined = False
 
@@ -78,15 +79,17 @@ class Connection(object):
     # call *if* the join is within a join already.
     @contextmanager
     def joincontext(self):
-        old = self._joined
+        was_joined = self._joined
         self._joined = True
-        if old:
+        if was_joined:
             self._pool._semaphore.counter += 1
+        try:
             yield
-            self._pool._semaphore.counter -= 1
-        else:
-            yield
-        self._joined = old
+        finally:
+            if was_joined:
+                self._pool._semaphore.counter -= 1
+            self._joined = was_joined
+        
 
     def join(self, functions):
         if self.concurrency <= 0:  # Useful for debugging
