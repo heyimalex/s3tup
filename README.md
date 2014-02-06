@@ -89,6 +89,7 @@ lifecycle | | The lifecycle configuration of the bucket. Valid values: Either a 
 logging | | The logging configuration of the bucket. Valid values: Either a string xml logging configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTlogging.html) page) or `None` which will delete the logging configuration for this bucket all together.
 notification | | The notification configuration of the bucket. Valid values: Either a string xml notification configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTnotification.html) page) or `None` which will delete the notification configuration for this bucket all together.
 policy | | The policy set on this bucket. Valid values: Either a string json policy (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/dev/AccessPolicyLanguage_HowToWritePolicies.html) page) or `None` which will delete the policy from this bucket all together.
+requester_pays | | Boolean value that says whether to enable or disable [requester pays](http://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html).
 tagging | | The tagging configuration of the bucket. Valid values: Either a string xml tagging configuration (detailed on [this](http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUTtagging.html) page) or `None` which will delete all tags from this bucket.
 versioning | | Boolean value that says wether to enable or suspend versioning. Note: Once versioning is enabled on a bucket it cannot be disabled, only suspended! Any bucket that has ever had versioning enabled cannot have a lifecycle configuration set!
 key_config | | Takes a list of key configuration dicts and applies them to all of the applicable keys in the bucket. See section Key Configuration for details.
@@ -164,3 +165,4 @@ This project is in early development and still has plenty of work before I can c
 * Larger test suite
 * Implement requester pays
 * Implement mfa delete
+* Better support for versioning

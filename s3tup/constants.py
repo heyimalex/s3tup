@@ -40,6 +40,7 @@ BUCKET_ATTRS = (
     'notification',
     'policy',
     'region',
+    'requester_pays',
     'tagging',
     'versioning',
     'website',

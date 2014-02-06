@@ -172,6 +172,7 @@ class Bucket(object):
             self.sync_logging,
             self.sync_notification,
             self.sync_policy,
+            self.sync_requester_pays,
             self.sync_tagging,
             self.sync_versioning,
             self.sync_website,
@@ -302,6 +303,20 @@ class Bucket(object):
             log.info("delete notification configuration")
             data = '<NotificationConfiguration />'
         return self.make_request('PUT', 'notification', data=data)
+
+    def sync_requester_pays(self):
+        try:
+            requester_pays = self.requester_pays
+        except AttributeError:
+            return False
+
+        payer = 'Requester' if requester_pays else 'BucketOwner'
+        log.info("set {} pays".format(payer))
+        data = ('<RequestPaymentConfiguration'
+                'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                '<Payer>{}</Payer>'
+                '</RequestPaymentConfiguration>').format(payer)
+        return self.make_request('PUT', 'requestPayment', data=data)
 
     def sync_policy(self):
         try:
