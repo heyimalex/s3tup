@@ -8,7 +8,6 @@ from s3tup.parse import load_config, parse_config
 
 log = logging.getLogger('s3tup')
 title = (
-    "\n"
     "        _____ __             \n"
     "   ____|__  // /___  ______  \n"
     "  / ___//_ </ __/ / / / __ \ \n"
@@ -52,16 +51,6 @@ parser.add_argument(
     help='your aws secret access key')
 
 
-class WrappedFormatter(logging.Formatter):
-
-    """Wrap log lines at 78 chars."""
-
-    def format(self, record):
-        formatted = super(WrappedFormatter, self).format(record)
-        split = formatted.split('\n')
-        return '\n'.join([textwrap.fill(l, 78) for l in split])
-
-
 def main():
 
     """Command line interface entry point."""
@@ -69,9 +58,7 @@ def main():
     args = parser.parse_args()
 
     if not (args.quiet or args.verbose):
-        handler = logging.StreamHandler()
-        handler.setFormatter(WrappedFormatter('%(message)s'))
-        log.addHandler(handler)
+        log.addHandler(make_wrapped_handler('%(message)s'))
         log.setLevel(logging.INFO)
     elif args.verbose:
         logging.basicConfig(format='%(levelname)s: %(message)s',
@@ -104,3 +91,18 @@ def run(config, dryrun=False, rsync=False, concurrency=None,
         if concurrency is not None:
             b.conn.concurrency = concurrency
         b.sync(dryrun=dryrun, rsync=rsync)
+
+
+def make_wrapped_handler(format):
+    handler = logging.StreamHandler()
+    handler.setFormatter(WrappedFormatter(format))
+
+
+class WrappedFormatter(logging.Formatter):
+
+    """Wrap log lines at 78 chars."""
+
+    def format(self, record):
+        formatted = super(WrappedFormatter, self).format(record)
+        split = formatted.split('\n')
+        return '\n'.join([textwrap.fill(l, 78) for l in split])
