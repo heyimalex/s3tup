@@ -44,11 +44,11 @@ verbosity.add_argument(
     action='store_true',
     help='silence all output')
 parser.add_argument(
-    '--access_key_id',
-    help='your aws access key id')
+    '--access_key_id')
 parser.add_argument(
-    '--secret_access_key',
-    help='your aws secret access key')
+    '--secret_access_key')
+parser.add_argument(
+    '--temporary_security_token')
 
 
 def main():
@@ -66,7 +66,8 @@ def main():
 
     try:
         run(args.config_path, args.dryrun, args.rsync, args.c,
-            args.access_key_id, args.secret_access_key)
+            args.access_key_id, args.secret_access_key,
+            args.temporary_security_token)
     except Exception as e:
         if args.verbose:
             raise
@@ -75,7 +76,8 @@ def main():
 
 
 def run(config, dryrun=False, rsync=False, concurrency=None,
-        access_key_id=None, secret_access_key=None,):
+        access_key_id=None, secret_access_key=None,
+        temporary_security_token=None):
 
     if access_key_id is not None:
         os.environ['AWS_ACCESS_KEY_ID'] = access_key_id
@@ -90,6 +92,8 @@ def run(config, dryrun=False, rsync=False, concurrency=None,
     for b in buckets:
         if concurrency is not None:
             b.conn.concurrency = concurrency
+        if temporary_security_token is not None:
+            b.conn.temporary_security_token = temporary_security_token
         b.sync(dryrun=dryrun, rsync=rsync)
 
 
