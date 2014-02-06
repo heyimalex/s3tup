@@ -81,15 +81,20 @@ class Bucket(object):
         handles paging automatically as well.
 
         """
+        subreqs = []
         for i in range(0, len(key_names), 1000):
-            data = ('<?xml version="1.0" encoding="UTF-8"?>'
-                    '<Delete><Quiet>true</Quiet>')
-            for k in key_names[i:i+1000]:
-                log.info('delete: s3://{}/{}'.format(self.name, k))
-                data += '<Object><Key>{}</Key></Object>'.format(k)
-            data += '</Delete>'
-            # TODO: Make this joinable.
-            self.make_request('POST', 'delete', data=data)
+            subreqs.append([self._delete_keys_subrequest, key_names[i:i+1000]])
+        self.conn.join(subreqs)
+
+    # len(key_names) must be <= 1000
+    def _delete_keys_subrequest(self, key_names):
+        data = '<?xml version="1.0" encoding="UTF-8"?><Delete>'
+        data += '<Quiet>true</Quiet>'
+        for k in key_names:
+            log.info('delete: s3://{}/{}'.format(self.name, k))
+            data += '<Object><Key>{}</Key></Object>'.format(k)
+        data += '</Delete>'
+        self.make_request('POST', 'delete', data=data)
 
     # Named get_remote_keys instead of just overriding __iter__
     # to avoid ambiguity. Doesn't return s3tup.key.Key objects for the
