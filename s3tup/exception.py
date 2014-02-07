@@ -18,7 +18,7 @@ class ActionConflict(Exception):
                 msg += "{} -> {}".format(action['type'], action['url'])
             elif action['type'] == 'upload':
                 msg += "{} <- {}".format(action['type'], action['path'])
-            msg += " + "
+            msg += " || "
         msg = msg[:-3]
         super(ActionConflict, self).__init__(msg)
 

@@ -100,6 +100,7 @@ def run(config, dryrun=False, rsync=False, concurrency=None,
 def make_wrapped_handler(format):
     handler = logging.StreamHandler()
     handler.setFormatter(WrappedFormatter(format))
+    return handler
 
 
 class WrappedFormatter(logging.Formatter):

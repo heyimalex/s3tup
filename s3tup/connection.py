@@ -13,8 +13,14 @@ from gevent import monkey
 monkey.patch_all(thread=False, select=False)
 
 # Make greenlets not print traceback info on exception.
-# I imagine this isn't a good thing to do, but pushing a
+# I imagine this isn't a good thing to do, but forcing a
 # traceback to stdout on a cli is a no go.
+#
+# However, in order to debug joined functions you may have
+# to comment out these lines. You can usually get around this
+# by just setting concurrency to 0, which will bypass gevent
+# and run each joined function linearly.
+#
 from gevent.hub import Hub
 Hub.print_exception = lambda *args, **kwargs: None
 

@@ -119,11 +119,8 @@ def parse_bucket(config):
 
     access_key_id = config.pop('access_key_id', None)
     secret_access_key = config.pop('secret_access_key', None)
-    if 'hostname' in config:
-        hostname = config.pop('hostname', None)
-    else:
-        hostname = "s3.amazonaws.com"
-    conn = Connection(access_key_id, secret_access_key, hostname)
+    hostname = config.pop('hostname', None)
+    conn = Connection(access_key_id, secret_access_key, hostname=hostname)
 
     with exception_ctx(bucket_name):
         if 'key_config' in config:
@@ -136,11 +133,15 @@ def parse_bucket(config):
         else:
             rsync_planner = None
 
+        if 'redirects' in config:
+            redirects = convert_redirects_to_dict(config.pop('redirects'))
+            config['redirects'] = redirects
+
         # Attempt to create and return a Bucket from the supplied config.
         # Bucket will throw TypeError if it gets unknown kwargs.
         try:
             return Bucket(conn, bucket_name, key_factory, rsync_planner,
-                          hostname=hostname, **config)
+                          **config)
         except TypeError as e:
             raise convert_type_error(e)
 
@@ -215,6 +216,20 @@ def parse_key_configurator(config):
     except TypeError as e:
         raise convert_type_error(e)
 
+@parse_method
+def convert_redirects_to_dict(config):
+    """Return redirects list converted to dict.
+
+    The reason this is done instead of just keeping the pairs as a dict in
+    yaml is because key names can be more complex than the yaml loader (or yaml
+    synyax parsers) like. This looks much cleaner while still eventually giving
+    the bucket object a python dict.
+
+    """
+    try:
+        return {r[0]:r[1] for r in config}
+    except:
+        raise ConfigParseError('redirects must be a list of tuples')
 
 @parse_method
 def extract_matcher(config):

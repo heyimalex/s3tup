@@ -1,4 +1,4 @@
-# All files larger than this size will use multipart uploading.
+# All files larger than this will use multipart uploading.
 MULTIPART_CUTOFF = 5242880
 
 # Size of the individual pieces in a multipart upload.
@@ -25,6 +25,7 @@ KEY_ATTRS = (
     'encrypted',
     'expires',
     'metadata',
+    'redirect_url',
     'reduced_redundancy',
 )
 
@@ -34,15 +35,14 @@ BUCKET_ATTRS = (
     'acl',
     'canned_acl',
     'cors',
-    'hostname',
     'lifecycle',
     'logging',
     'notification',
     'policy',
+    'redirects',
     'region',
     'requester_pays',
     'tagging',
     'versioning',
     'website',
-    'redirects',
 )

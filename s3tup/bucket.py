@@ -3,7 +3,7 @@ import logging
 
 from bs4 import BeautifulSoup
 
-from s3tup.key import KeyFactory, redirect_key, delete_key
+from s3tup.key import KeyFactory, delete_key
 from s3tup.rsync import RsyncPlanner
 import s3tup.constants as constants
 
@@ -22,13 +22,13 @@ class Bucket(object):
 
     """
 
-    def __init__(self, conn, name, key_factory=None,
-                 rsync_planner=None, **kwargs):
+    def __init__(self, conn, name, key_factory=None, rsync_planner=None,
+                 **kwargs):
         self.conn = conn
         self.name = name
         self.key_factory = key_factory or KeyFactory()
         self.rsync_planner = rsync_planner or RsyncPlanner()
-        self.redirects = kwargs.pop('redirects', [])
+        self.redirects = kwargs.pop('redirects', {})
 
         # Add all kwargs passed in that are named in
         # constants.BUCKET_ATTRS to this object instance
@@ -40,8 +40,8 @@ class Bucket(object):
                        " argument '{}'".format(k))
                 raise TypeError(msg)
 
-    def make_request(self, method, subresource=None, params=None, data=None,
-                     headers=None):
+    def make_request(self, method, subresource=None, params=None,
+                     data=None, headers=None):
         """Convenience method for self.conn.make_request."""
         # Has bucket and key fields already filled in.
         return self.conn.make_request(
@@ -57,18 +57,27 @@ class Bucket(object):
     # KEY METHODS
 
     def make_key(self, key_name):
-        return self.key_factory.make_key(self.conn, self.name, key_name)
+        return  self.key_factory.make_key(self.conn, self.name, key_name)
 
     def sync_key(self, key_name):
         key = self.make_key(key_name)
         key.sync()
 
-    def upload_key(self, key_name, path):
+    def upload_key_from_path(self, key_name, path):
         key = self.make_key(key_name)
-        key.upload(open(path.replace(" ", "\\ "), 'rb'))
+        key.upload_from_path(path)
 
-    def redirect_key(self, key_name, redirect_url):
-        redirect_key(self.conn, self.name, key_name, redirect_url)
+    def upload_key_from_file(self, key_name, f):
+        key = self.make_key(key_name)
+        key.upload_from_file(f)
+
+    def upload_key_from_string(self, key_name, string):
+        key = self.make_key(key_name)
+        key.upload_from_string(string)
+
+    def redirect_key(self, key_name, url):
+        key = self.make_key(key_name)
+        key.redirect(url)
 
     def delete_key(self, key_name):
         delete_key(self.conn, self.name, key_name)
@@ -98,7 +107,7 @@ class Bucket(object):
 
     # Named get_remote_keys instead of just overriding __iter__
     # to avoid ambiguity. Doesn't return s3tup.key.Key objects for the
-    # same reason. Requests can't be parallel as each depends on
+    # same reason. Requests can't be concurrent as each depends on
     # the marker from the last.
     def get_remote_keys(self, prefix=None):
         """Return list representing all keys in this bucket.
@@ -133,7 +142,7 @@ class Bucket(object):
 
     # SYNC METHODS
 
-    def sync(self, dryrun=False, rsync=False):
+    def sync(self, dryrun=False, rsync=False, create_bucket=False):
         """Sync all of this bucket's configurations.
 
         Takes every applicable attribute set on this Bucket object and
@@ -144,7 +153,8 @@ class Bucket(object):
         """
         log.info("syncing bucket '{}'...".format(self.name))
 
-        self.create()
+        if create_bucket:
+            self.create()
         if not rsync:
             self.sync_bucket(dryrun=dryrun)
         self.sync_keys(dryrun=dryrun, rsync=rsync)
@@ -153,10 +163,12 @@ class Bucket(object):
 
     def create(self):
         """Create this bucket."""
+
         try:
-            headers = {'x-amz-acl': self.canned_acl}
+            headers = {'x-amz-acl': (self.canned_acl or 'private')}
         except AttributeError:
-            headers = None
+            headers = None            
+
         try:
             data = ('<CreateBucketConfiguration '
                     'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
@@ -164,6 +176,7 @@ class Bucket(object):
                     '</CreateBucketConfiguration>').format(self.region)
         except AttributeError:
             data = None
+
         self.make_request('PUT', headers=headers, data=data)
 
     def sync_bucket(self, dryrun=False):
@@ -194,8 +207,6 @@ class Bucket(object):
                 log.info("upload: {} <- {}".format(k, path))
             for k in plan.to_sync:
                 log.info("sync: {}".format(k))
-            for k, url in plan.to_redirect:
-                log.info("redirect: {} -> {}".format(k, url))
             for k in plan.to_delete:
                 log.info("delete: {}".format(k))
 
@@ -205,10 +216,10 @@ class Bucket(object):
         plan = self.rsync_planner.plan(remote_keys)
 
         # Add in redirects
-        for key, url in self.redirects:
+        for key, url in self.redirects.items():
             plan.add_redirect(key, url)
 
-        # Sync all keys with no action yet associated
+        # Sync all keys with no action yet associated.
         affected_keys = set(plan.affected_keys)
         old_keys = set(remote_keys.keys())
         for k in (old_keys-affected_keys):
@@ -221,13 +232,18 @@ class Bucket(object):
 
     def _execute_action_plan(self, plan):
         actions = []
+
         for k, path in plan.to_upload:
-            actions.append([self.upload_key, k, path])
-        for k in plan.to_sync:
-            actions.append([self.sync_key, k])
+            actions.append([self.upload_key_from_path, k, path])
+
         for k, url in plan.to_redirect:
             actions.append([self.redirect_key, k, url])
+
+        for k in plan.to_sync:
+            actions.append([self.sync_key, k])
+
         actions.append([self.delete_keys, list(plan.to_delete)])
+
         self.conn.join(actions)
 
     # INDIVIDUAL BUCKET SYNCING METHODS
@@ -237,7 +253,10 @@ class Bucket(object):
     # response in the form of a requests.Response object if the attr is set,
     # and if not will return False. These map directly to the fields
     # defined in the bucket config section of the readme, so if you're
-    # looking for details on what values are allowed check there.
+    # looking for details on what values are allowed check there. Some are
+    # somewhat opinionated, but the docs tries to be explicit where they
+    # accept xml vs boolean and they're easy to re-implement if you need
+    # more control.
 
     def sync_acl(self):
         try:

@@ -60,20 +60,12 @@ class KeyConfigurator(object):
         return key
 
 
-# Both deletion and redirection disregard key configuration,
-# so they can be standalone methods.
-
+# Deletion does not care about key configuration,
+# so it can be a standalone method.
 def delete_key(conn, bucket, key):
     path = key_pretty_path(bucket, key)
     log.info('delete: {}'.format(path))
     conn.make_request('DELETE', bucket, key)
-
-
-def redirect_key(conn, bucket, key, redirect_url):
-    path = key_pretty_path(bucket, key)
-    log.info('redirect: {} \n{} {}'.format(path, "to".rjust(12), redirect_url))
-    headers = {'x-amz-website-redirect-location': redirect_url}
-    conn.make_request('PUT', bucket, key, headers=headers)
 
 
 def key_pretty_path(bucket, key):
@@ -149,6 +141,11 @@ class Key(object):
         except AttributeError:
             pass
 
+        try:
+            headers['x-amz-website-redirect-location'] = self.redirect_url
+        except AttributeError:
+            pass
+
         if self.reduced_redundancy:
             headers['x-amz-storage-class'] = 'REDUCED_REDUNDANCY'
 
@@ -174,9 +171,15 @@ class Key(object):
     def delete(self):
         delete_key(self.conn, self.bucket_name, self.name)
 
-    def redirect(self, redirect_url):
-        redirect_key(self.conn, self.bucket_name, self.name, redirect_url)
+    def redirect(self, url):
+        """Uploads a zero byte redirect to url."""
+        msg = 'redirect: {}\n          to {}'.format(self.pretty_path, url)
+        log.info(msg)
+        headers = self.get_headers()
+        headers['x-amz-website-redirect-location'] = url
+        self.make_request('PUT', headers=headers)
 
+    # Does a copy-source PUT so key *must* already exist.
     def sync(self):
         """Sync this object's configuration with its respective key on s3."""
         log.info("sync: {}".format(self.pretty_path))
@@ -191,34 +194,41 @@ class Key(object):
         self.make_request('PUT', headers=headers)
         self.sync_acl()
 
-    def upload(self, f):
-        """Upload file like object to s3 with this key's configuration."""
+    def upload_from_path(self, path):
+        with open(path.replace(" ", "\\ "), 'rb') as f:
+            self.upload_from_file(f)
 
-        msg = "upload: {}".format(self.pretty_path)
-        try:
-            msg += "\n" + "from ".rjust(13) + f.name
-        except AttributeError:
-            pass
-        log.info(msg)
-            
-
+    def upload_from_file(self, f):
         if utils.f_sizeof(f) <= constants.MULTIPART_CUTOFF:
             self._basic_upload(f)
         else:
             self._multipart_upload(f)
-        self.sync_acl()
 
-    def _basic_upload(self, f):
-        headers = self.get_headers()
-        self.make_request('PUT', headers=headers, data=f)
+    def upload_from_string(self, string):
+        self._basic_upload(string)
 
-    def _multipart_upload(self, f):
+    def log_upload(self, source=None):
+        msg = 'upload: {}'.format(self.pretty_path)
+        if source is not None:
+            msg += '\n        from '
+            try:
+                msg += source.name
+            except:
+                msg += '"{}"'.format(source)
+        log.info(msg)
+
+    def _basic_upload(self, data):
+        self.log_upload(data)
+        self.make_request('PUT', headers=self.get_headers(), data=data)
+
+    def _multipart_upload(self, file_like_object):
+        self.log_upload(file_like_object)
         upload_id = self._initiate_multipart_upload()
 
         # Upload individual parts
         upload_reqs = []
         parts = []
-        chunks = utils.f_chunk(f, constants.MULTIPART_PART_SIZE)
+        chunks = utils.f_chunk(file_like_object, constants.MULTIPART_PART_SIZE)
         for r in range(len(chunks)):
             upload_reqs.append([
                 self._multipart_upload_part,
@@ -236,6 +246,7 @@ class Key(object):
         self._complete_multipart_upload(upload_id, parts)
 
     def _initiate_multipart_upload(self):
+        """Initiates a multipart upload and returns the upload id."""
         headers = self.get_headers()
         resp = self.make_request('POST', 'uploads', headers=headers)
         return BeautifulSoup(resp.text).find('uploadid').text

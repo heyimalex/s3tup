@@ -78,11 +78,22 @@ def test_key_sync():
         headers=expected_headers,
     )
 
-def test_key_upload():
+def test_key_upload_from_file():
     conn = ConnMock()
     key = Key(conn, 'test', 'test')
     s = StringIO('test')
-    key.upload(s)
+    key.upload_from_file(s)
+    conn.make_request.assert_called_once_with(
+        'PUT',
+        'test',
+        'test',
+        data='test'
+    )
+
+def test_key_upload_from_string():
+    conn = ConnMock()
+    key = Key(conn, 'test', 'test')
+    key.upload_from_string('test')
     conn.make_request.assert_called_once_with(
         'PUT',
         'test',
