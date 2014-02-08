@@ -94,7 +94,7 @@ tagging | | The tagging configuration of the bucket. Valid values: Either a stri
 versioning | | Boolean value that says wether to enable or suspend versioning. Note: Once versioning is enabled on a bucket it cannot be disabled, only suspended! Any bucket that has ever had versioning enabled cannot have a lifecycle configuration set!
 key_config | | Takes a list of key configuration dicts and applies them to all of the applicable keys in the bucket. See section Key Configuration for details.
 rsync | | Takes either an rsync configuration dict or a list of them and "rsyncs" a folder with the bucket. See section Rsync Configuration for details.
-redirects | [ ] | Takes a list of [key, redirect location] pairs. If the target key does not exist (or is not being uploaded), the bucket will create a zero byte key. Keys that are redirected still keep all of their key configurations.
+redirects | [ ] | Takes a list of [key, redirect location] pairs. On sync the bucket will *create a zero byte key* and upload it. If there is something that has or that will be uploaded in that key location, an ActionConflict exception will be raised. Redirection of keys that need to actually hold a value must be done by creating a key config with a pattern that matches one key and adding the `redirect_url` field.
 
 #### Key Configuration
 
