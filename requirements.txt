@@ -1,7 +1,7 @@
 PyYAML==3.10
 argparse==1.2.1
 beautifulsoup4==4.3.1
-requests==1.2.3
+requests==2.20.0
 wsgiref==0.1.2
 gevent==1.0
 mock==1.0.1
